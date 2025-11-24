@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	workflow "github.com/sicko7947/gorkflow"
+	"github.com/sicko7947/gorkflow"
 	"github.com/sicko7947/gorkflow/builder"
 	"github.com/sicko7947/gorkflow/store"
 	"github.com/stretchr/testify/assert"
@@ -44,7 +44,7 @@ type FilterOutput struct {
 }
 
 // Test step handlers
-func discoverCompanies(ctx *workflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
+func discoverCompanies(ctx *gorkflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
 	ctx.Logger.Info().
 		Str("query", input.Query).
 		Int("limit", input.Limit).
@@ -57,9 +57,9 @@ func discoverCompanies(ctx *workflow.StepContext, input DiscoverInput) (Discover
 	}, nil
 }
 
-func enrichCompanies(ctx *workflow.StepContext, input EnrichInput) (EnrichOutput, error) {
+func enrichCompanies(ctx *gorkflow.StepContext, input EnrichInput) (EnrichOutput, error) {
 	// Access previous step output
-	discoverResult, err := workflow.GetTypedOutput[DiscoverOutput](ctx.Outputs, "discover")
+	discoverResult, err := gorkflow.GetTypedOutput[DiscoverOutput](ctx.Outputs, "discover")
 	if err != nil {
 		return EnrichOutput{}, err
 	}
@@ -80,8 +80,8 @@ func enrichCompanies(ctx *workflow.StepContext, input EnrichInput) (EnrichOutput
 	return EnrichOutput{Enriched: enriched}, nil
 }
 
-func filterCompanies(ctx *workflow.StepContext, input FilterInput) (FilterOutput, error) {
-	enrichResult, err := workflow.GetTypedOutput[EnrichOutput](ctx.Outputs, "enrich")
+func filterCompanies(ctx *gorkflow.StepContext, input FilterInput) (FilterOutput, error) {
+	enrichResult, err := gorkflow.GetTypedOutput[EnrichOutput](ctx.Outputs, "enrich")
 	if err != nil {
 		return FilterOutput{}, err
 	}
@@ -95,7 +95,7 @@ func filterCompanies(ctx *workflow.StepContext, input FilterInput) (FilterOutput
 }
 
 // Helper to create engine
-func createTestEngine(t *testing.T) (*Engine, workflow.WorkflowStore) {
+func createTestEngine(t *testing.T) (*Engine, gorkflow.WorkflowStore) {
 	wfStore := store.NewMemoryStore()
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 	engine := NewEngine(wfStore,
@@ -109,7 +109,7 @@ func createTestEngine(t *testing.T) (*Engine, workflow.WorkflowStore) {
 }
 
 // Helper to wait for workflow completion
-func waitForCompletion(t *testing.T, engine *Engine, runID string, timeout time.Duration) *workflow.WorkflowRun {
+func waitForCompletion(t *testing.T, engine *Engine, runID string, timeout time.Duration) *gorkflow.WorkflowRun {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -135,9 +135,9 @@ func TestEngine_SimpleSequentialWorkflow(t *testing.T) {
 	engine, _ := createTestEngine(t)
 
 	// Build workflow
-	discoverStep := workflow.NewStep("discover", "Discover Companies", discoverCompanies)
-	enrichStep := workflow.NewStep("enrich", "Enrich Companies", enrichCompanies)
-	filterStep := workflow.NewStep("filter", "Filter Companies", filterCompanies)
+	discoverStep := gorkflow.NewStep("discover", "Discover Companies", discoverCompanies)
+	enrichStep := gorkflow.NewStep("enrich", "Enrich Companies", enrichCompanies)
+	filterStep := gorkflow.NewStep("filter", "Filter Companies", filterCompanies)
 
 	wf, err := builder.NewWorkflow("sequential_test", "Sequential Test").
 		ThenStep(discoverStep).
@@ -160,7 +160,7 @@ func TestEngine_SimpleSequentialWorkflow(t *testing.T) {
 	run := waitForCompletion(t, engine, runID, 10*time.Second)
 
 	// Verify final status
-	assert.Equal(t, workflow.RunStatusCompleted, run.Status)
+	assert.Equal(t, gorkflow.RunStatusCompleted, run.Status)
 	assert.Equal(t, 1.0, run.Progress)
 	assert.NotNil(t, run.CompletedAt)
 
@@ -171,7 +171,7 @@ func TestEngine_SimpleSequentialWorkflow(t *testing.T) {
 
 	// All steps should be completed
 	for _, step := range steps {
-		assert.Equal(t, workflow.StepStatusCompleted, step.Status)
+		assert.Equal(t, gorkflow.StepStatusCompleted, step.Status)
 		assert.NotNil(t, step.CompletedAt)
 	}
 }
@@ -180,11 +180,11 @@ func TestEngine_WorkflowWithFailure(t *testing.T) {
 	engine, _ := createTestEngine(t)
 
 	// Step that always fails
-	failingStep := workflow.NewStep("failing", "Failing Step",
-		func(ctx *workflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
+	failingStep := gorkflow.NewStep("failing", "Failing Step",
+		func(ctx *gorkflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
 			return DiscoverOutput{}, errors.New("intentional failure")
 		},
-		workflow.WithRetries(2),
+		gorkflow.WithRetries(2),
 	)
 
 	wf, err := builder.NewWorkflow("failing_workflow", "Failing Workflow").
@@ -200,7 +200,7 @@ func TestEngine_WorkflowWithFailure(t *testing.T) {
 	run := waitForCompletion(t, engine, runID, 10*time.Second)
 
 	// Should fail
-	assert.Equal(t, workflow.RunStatusFailed, run.Status)
+	assert.Equal(t, gorkflow.RunStatusFailed, run.Status)
 	assert.NotNil(t, run.Error)
 	assert.Contains(t, run.Error.Message, "intentional failure")
 }
@@ -209,15 +209,15 @@ func TestEngine_WorkflowProgress(t *testing.T) {
 	engine, _ := createTestEngine(t)
 
 	// Slow steps to observe progress
-	slowStep1 := workflow.NewStep("slow1", "Slow Step 1",
-		func(ctx *workflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
+	slowStep1 := gorkflow.NewStep("slow1", "Slow Step 1",
+		func(ctx *gorkflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
 			time.Sleep(500 * time.Millisecond)
 			return DiscoverOutput{Companies: []string{"A"}, Count: 1}, nil
 		},
 	)
 
-	slowStep2 := workflow.NewStep("slow2", "Slow Step 2",
-		func(ctx *workflow.StepContext, input EnrichInput) (EnrichOutput, error) {
+	slowStep2 := gorkflow.NewStep("slow2", "Slow Step 2",
+		func(ctx *gorkflow.StepContext, input EnrichInput) (EnrichOutput, error) {
 			time.Sleep(500 * time.Millisecond)
 			return EnrichOutput{Enriched: map[string]interface{}{"A": "data"}}, nil
 		},
@@ -248,8 +248,8 @@ func TestEngine_StepOutputPassing(t *testing.T) {
 	engine, wfStore := createTestEngine(t)
 
 	// Build workflow
-	discoverStep := workflow.NewStep("discover", "Discover", discoverCompanies)
-	enrichStep := workflow.NewStep("enrich", "Enrich", enrichCompanies)
+	discoverStep := gorkflow.NewStep("discover", "Discover", discoverCompanies)
+	enrichStep := gorkflow.NewStep("enrich", "Enrich", enrichCompanies)
 
 	wf, err := builder.NewWorkflow("output_test", "Output Test").
 		ThenStep(discoverStep).
@@ -285,8 +285,8 @@ func TestEngine_StepOutputPassing(t *testing.T) {
 func TestEngine_GetStepExecutions(t *testing.T) {
 	engine, _ := createTestEngine(t)
 
-	discoverStep := workflow.NewStep("discover", "Discover", discoverCompanies)
-	enrichStep := workflow.NewStep("enrich", "Enrich", enrichCompanies)
+	discoverStep := gorkflow.NewStep("discover", "Discover", discoverCompanies)
+	enrichStep := gorkflow.NewStep("enrich", "Enrich", enrichCompanies)
 
 	wf, err := builder.NewWorkflow("test", "Test").
 		ThenStep(discoverStep).
@@ -318,7 +318,7 @@ func TestEngine_GetStepExecutions(t *testing.T) {
 func TestEngine_ListRuns(t *testing.T) {
 	engine, _ := createTestEngine(t)
 
-	step := workflow.NewStep("test", "Test", discoverCompanies)
+	step := gorkflow.NewStep("test", "Test", discoverCompanies)
 
 	wf, err := builder.NewWorkflow("diamond_test", "Diamond Test").
 		ThenStep(step).
@@ -333,7 +333,7 @@ func TestEngine_ListRuns(t *testing.T) {
 	waitForCompletion(t, engine, runID2, 10*time.Second)
 
 	// List runs
-	filter := workflow.RunFilter{
+	filter := gorkflow.RunFilter{
 		WorkflowID: "diamond_test",
 		Limit:      10,
 	}
@@ -348,8 +348,8 @@ func TestEngine_Cancel(t *testing.T) {
 	engine, _ := createTestEngine(t)
 
 	// Long-running step
-	longStep := workflow.NewStep("long", "Long Step",
-		func(ctx *workflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
+	longStep := gorkflow.NewStep("long", "Long Step",
+		func(ctx *gorkflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
 			// Simulate long operation
 			select {
 			case <-ctx.Done():
@@ -379,15 +379,15 @@ func TestEngine_Cancel(t *testing.T) {
 	// Wait and verify cancellation
 	time.Sleep(500 * time.Millisecond)
 	run, _ := engine.GetRun(context.Background(), runID)
-	assert.Equal(t, workflow.RunStatusCancelled, run.Status)
+	assert.Equal(t, gorkflow.RunStatusCancelled, run.Status)
 }
 
 func TestEngine_WorkflowState(t *testing.T) {
 	engine, wfStore := createTestEngine(t)
 
 	// Step that uses state
-	statefulStep := workflow.NewStep("stateful", "Stateful Step",
-		func(ctx *workflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
+	statefulStep := gorkflow.NewStep("stateful", "Stateful Step",
+		func(ctx *gorkflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
 			// Write to state
 			ctx.State.Set("timestamp", time.Now().Unix())
 			ctx.State.Set("query", input.Query)

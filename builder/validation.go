@@ -3,11 +3,11 @@ package builder
 import (
 	"fmt"
 
-	workflow "github.com/sicko7947/gorkflow"
+	"github.com/sicko7947/gorkflow"
 )
 
 // ValidateWorkflow performs comprehensive validation on a workflow
-func ValidateWorkflow(w *workflow.Workflow) error {
+func ValidateWorkflow(w *gorkflow.Workflow) error {
 	// Validate graph
 	if err := w.Graph().Validate(); err != nil {
 		return fmt.Errorf("invalid workflow graph: %w", err)
@@ -24,12 +24,12 @@ func ValidateWorkflow(w *workflow.Workflow) error {
 }
 
 // ValidateGraph validates the execution graph structure
-func ValidateGraph(graph *workflow.ExecutionGraph) error {
+func ValidateGraph(graph *gorkflow.ExecutionGraph) error {
 	return graph.Validate()
 }
 
 // ValidateNoCycles checks for cycles in the graph
-func ValidateNoCycles(graph *workflow.ExecutionGraph) error {
+func ValidateNoCycles(graph *gorkflow.ExecutionGraph) error {
 	if len(graph.Nodes) == 0 {
 		return nil
 	}
@@ -69,7 +69,7 @@ func ValidateNoCycles(graph *workflow.ExecutionGraph) error {
 }
 
 // ValidateReachability ensures all nodes are reachable from the entry point
-func ValidateReachability(graph *workflow.ExecutionGraph) error {
+func ValidateReachability(graph *gorkflow.ExecutionGraph) error {
 	if graph.EntryPoint == "" {
 		return fmt.Errorf("no entry point set")
 	}
@@ -101,7 +101,7 @@ func ValidateReachability(graph *workflow.ExecutionGraph) error {
 }
 
 // ValidateStepReferences ensures all referenced steps exist in the workflow
-func ValidateStepReferences(w *workflow.Workflow) error {
+func ValidateStepReferences(w *gorkflow.Workflow) error {
 	for stepID := range w.Graph().Nodes {
 		if _, err := w.GetStep(stepID); err != nil {
 			return fmt.Errorf("step %s referenced in graph but not registered", stepID)

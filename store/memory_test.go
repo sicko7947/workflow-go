@@ -15,18 +15,18 @@ func TestNewMemoryStore(t *testing.T) {
 	}
 
 	// Verify it implements the interface
-	var _ workflow.WorkflowStore = store
+	var _ gorkflow.WorkflowStore = store
 }
 
 func TestMemoryStore_CreateRun(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
 		ResourceID: "resource-1",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -51,10 +51,10 @@ func TestMemoryStore_CreateRun_Duplicate(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -85,10 +85,10 @@ func TestMemoryStore_UpdateRun(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -98,7 +98,7 @@ func TestMemoryStore_UpdateRun(t *testing.T) {
 	}
 
 	// Update status
-	run.Status = workflow.RunStatusRunning
+	run.Status = gorkflow.RunStatusRunning
 	if err := store.UpdateRun(ctx, run); err != nil {
 		t.Fatalf("UpdateRun() failed: %v", err)
 	}
@@ -109,8 +109,8 @@ func TestMemoryStore_UpdateRun(t *testing.T) {
 		t.Fatalf("GetRun() failed: %v", err)
 	}
 
-	if retrieved.Status != workflow.RunStatusRunning {
-		t.Errorf("Updated status = %s, want %s", retrieved.Status, workflow.RunStatusRunning)
+	if retrieved.Status != gorkflow.RunStatusRunning {
+		t.Errorf("Updated status = %s, want %s", retrieved.Status, gorkflow.RunStatusRunning)
 	}
 }
 
@@ -118,9 +118,9 @@ func TestMemoryStore_UpdateRun_NotFound(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:  "non-existent",
-		Status: workflow.RunStatusRunning,
+		Status: gorkflow.RunStatusRunning,
 	}
 
 	err := store.UpdateRun(ctx, run)
@@ -133,10 +133,10 @@ func TestMemoryStore_UpdateRunStatus(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -146,12 +146,12 @@ func TestMemoryStore_UpdateRunStatus(t *testing.T) {
 	}
 
 	// Update status with error
-	wfErr := &workflow.WorkflowError{
+	wfErr := &gorkflow.WorkflowError{
 		Code:    "TEST_ERROR",
 		Message: "test error",
 	}
 
-	if err := store.UpdateRunStatus(ctx, run.RunID, workflow.RunStatusFailed, wfErr); err != nil {
+	if err := store.UpdateRunStatus(ctx, run.RunID, gorkflow.RunStatusFailed, wfErr); err != nil {
 		t.Fatalf("UpdateRunStatus() failed: %v", err)
 	}
 
@@ -161,8 +161,8 @@ func TestMemoryStore_UpdateRunStatus(t *testing.T) {
 		t.Fatalf("GetRun() failed: %v", err)
 	}
 
-	if retrieved.Status != workflow.RunStatusFailed {
-		t.Errorf("Updated status = %s, want %s", retrieved.Status, workflow.RunStatusFailed)
+	if retrieved.Status != gorkflow.RunStatusFailed {
+		t.Errorf("Updated status = %s, want %s", retrieved.Status, gorkflow.RunStatusFailed)
 	}
 
 	if retrieved.Error == nil {
@@ -177,12 +177,12 @@ func TestMemoryStore_ListRuns(t *testing.T) {
 	ctx := context.Background()
 
 	// Create multiple runs
-	runs := []*workflow.WorkflowRun{
+	runs := []*gorkflow.WorkflowRun{
 		{
 			RunID:      "run-1",
 			WorkflowID: "workflow-1",
 			ResourceID: "resource-1",
-			Status:     workflow.RunStatusPending,
+			Status:     gorkflow.RunStatusPending,
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		},
@@ -190,7 +190,7 @@ func TestMemoryStore_ListRuns(t *testing.T) {
 			RunID:      "run-2",
 			WorkflowID: "workflow-1",
 			ResourceID: "resource-1",
-			Status:     workflow.RunStatusRunning,
+			Status:     gorkflow.RunStatusRunning,
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		},
@@ -198,7 +198,7 @@ func TestMemoryStore_ListRuns(t *testing.T) {
 			RunID:      "run-3",
 			WorkflowID: "workflow-2",
 			ResourceID: "resource-2",
-			Status:     workflow.RunStatusCompleted,
+			Status:     gorkflow.RunStatusCompleted,
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		},
@@ -212,38 +212,38 @@ func TestMemoryStore_ListRuns(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		filter workflow.RunFilter
+		filter gorkflow.RunFilter
 		want   int
 	}{
 		{
 			name:   "no filter",
-			filter: workflow.RunFilter{},
+			filter: gorkflow.RunFilter{},
 			want:   3,
 		},
 		{
 			name: "filter by workflow ID",
-			filter: workflow.RunFilter{
+			filter: gorkflow.RunFilter{
 				WorkflowID: "workflow-1",
 			},
 			want: 2,
 		},
 		{
 			name: "filter by status",
-			filter: workflow.RunFilter{
-				Status: &[]workflow.RunStatus{workflow.RunStatusPending}[0],
+			filter: gorkflow.RunFilter{
+				Status: &[]gorkflow.RunStatus{gorkflow.RunStatusPending}[0],
 			},
 			want: 1,
 		},
 		{
 			name: "filter by resource ID",
-			filter: workflow.RunFilter{
+			filter: gorkflow.RunFilter{
 				ResourceID: "resource-1",
 			},
 			want: 2,
 		},
 		{
 			name: "filter with limit",
-			filter: workflow.RunFilter{
+			filter: gorkflow.RunFilter{
 				Limit: 2,
 			},
 			want: 2,
@@ -269,10 +269,10 @@ func TestMemoryStore_CreateStepExecution(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a run first
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -280,10 +280,10 @@ func TestMemoryStore_CreateStepExecution(t *testing.T) {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
 
-	exec := &workflow.StepExecution{
+	exec := &gorkflow.StepExecution{
 		RunID:     "test-run-1",
 		StepID:    "step-1",
-		Status:    workflow.StepStatusPending,
+		Status:    gorkflow.StepStatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -317,10 +317,10 @@ func TestMemoryStore_UpdateStepExecution(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -328,10 +328,10 @@ func TestMemoryStore_UpdateStepExecution(t *testing.T) {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
 
-	exec := &workflow.StepExecution{
+	exec := &gorkflow.StepExecution{
 		RunID:     "test-run-1",
 		StepID:    "step-1",
-		Status:    workflow.StepStatusPending,
+		Status:    gorkflow.StepStatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -341,7 +341,7 @@ func TestMemoryStore_UpdateStepExecution(t *testing.T) {
 	}
 
 	// Update status
-	exec.Status = workflow.StepStatusCompleted
+	exec.Status = gorkflow.StepStatusCompleted
 	if err := store.UpdateStepExecution(ctx, exec); err != nil {
 		t.Fatalf("UpdateStepExecution() failed: %v", err)
 	}
@@ -352,8 +352,8 @@ func TestMemoryStore_UpdateStepExecution(t *testing.T) {
 		t.Fatalf("GetStepExecution() failed: %v", err)
 	}
 
-	if retrieved.Status != workflow.StepStatusCompleted {
-		t.Errorf("Updated status = %s, want %s", retrieved.Status, workflow.StepStatusCompleted)
+	if retrieved.Status != gorkflow.StepStatusCompleted {
+		t.Errorf("Updated status = %s, want %s", retrieved.Status, gorkflow.StepStatusCompleted)
 	}
 }
 
@@ -361,10 +361,10 @@ func TestMemoryStore_ListStepExecutions(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -375,10 +375,10 @@ func TestMemoryStore_ListStepExecutions(t *testing.T) {
 	// Create multiple step executions
 	steps := []string{"step-1", "step-2", "step-3"}
 	for _, stepID := range steps {
-		exec := &workflow.StepExecution{
+		exec := &gorkflow.StepExecution{
 			RunID:     "test-run-1",
 			StepID:    stepID,
-			Status:    workflow.StepStatusPending,
+			Status:    gorkflow.StepStatusPending,
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
@@ -416,10 +416,10 @@ func TestMemoryStore_SaveAndLoadStepOutput(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -459,10 +459,10 @@ func TestMemoryStore_SaveAndLoadState(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -492,10 +492,10 @@ func TestMemoryStore_LoadState_NotFound(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -513,10 +513,10 @@ func TestMemoryStore_DeleteState(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -547,10 +547,10 @@ func TestMemoryStore_GetAllState(t *testing.T) {
 	store := NewMemoryStore()
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -612,12 +612,12 @@ func TestMemoryStore_CountRunsByStatus(t *testing.T) {
 	ctx := context.Background()
 
 	// Create multiple runs
-	runs := []*workflow.WorkflowRun{
+	runs := []*gorkflow.WorkflowRun{
 		{
 			RunID:      "run-1",
 			WorkflowID: "workflow-1",
 			ResourceID: "resource-1",
-			Status:     workflow.RunStatusPending,
+			Status:     gorkflow.RunStatusPending,
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		},
@@ -625,7 +625,7 @@ func TestMemoryStore_CountRunsByStatus(t *testing.T) {
 			RunID:      "run-2",
 			WorkflowID: "workflow-1",
 			ResourceID: "resource-1",
-			Status:     workflow.RunStatusRunning,
+			Status:     gorkflow.RunStatusRunning,
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		},
@@ -633,7 +633,7 @@ func TestMemoryStore_CountRunsByStatus(t *testing.T) {
 			RunID:      "run-3",
 			WorkflowID: "workflow-2",
 			ResourceID: "resource-1",
-			Status:     workflow.RunStatusPending,
+			Status:     gorkflow.RunStatusPending,
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		},
@@ -641,7 +641,7 @@ func TestMemoryStore_CountRunsByStatus(t *testing.T) {
 			RunID:      "run-4",
 			WorkflowID: "workflow-3",
 			ResourceID: "resource-2",
-			Status:     workflow.RunStatusPending,
+			Status:     gorkflow.RunStatusPending,
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		},
@@ -656,31 +656,31 @@ func TestMemoryStore_CountRunsByStatus(t *testing.T) {
 	tests := []struct {
 		name       string
 		resourceID string
-		status     workflow.RunStatus
+		status     gorkflow.RunStatus
 		want       int
 	}{
 		{
 			name:       "count pending for resource-1",
 			resourceID: "resource-1",
-			status:     workflow.RunStatusPending,
+			status:     gorkflow.RunStatusPending,
 			want:       2,
 		},
 		{
 			name:       "count running for resource-1",
 			resourceID: "resource-1",
-			status:     workflow.RunStatusRunning,
+			status:     gorkflow.RunStatusRunning,
 			want:       1,
 		},
 		{
 			name:       "count pending for resource-2",
 			resourceID: "resource-2",
-			status:     workflow.RunStatusPending,
+			status:     gorkflow.RunStatusPending,
 			want:       1,
 		},
 		{
 			name:       "count completed for resource-1",
 			resourceID: "resource-1",
-			status:     workflow.RunStatusCompleted,
+			status:     gorkflow.RunStatusCompleted,
 			want:       0,
 		},
 	}
@@ -707,10 +707,10 @@ func TestMemoryStore_ThreadSafety(t *testing.T) {
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
 		go func(id int) {
-			run := &workflow.WorkflowRun{
+			run := &gorkflow.WorkflowRun{
 				RunID:      string(rune('A' + id)),
 				WorkflowID: "test-workflow",
-				Status:     workflow.RunStatusPending,
+				Status:     gorkflow.RunStatusPending,
 				CreatedAt:  time.Now(),
 				UpdatedAt:  time.Now(),
 			}

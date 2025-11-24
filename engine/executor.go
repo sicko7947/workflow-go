@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	workflow "github.com/sicko7947/gorkflow"
+	"github.com/sicko7947/gorkflow"
 )
 
 // StepExecutionResult holds the result of a step execution
@@ -20,20 +20,20 @@ type StepExecutionResult struct {
 // executeStep runs a single step with retry/timeout logic
 func (e *Engine) executeStep(
 	ctx context.Context,
-	run *workflow.WorkflowRun,
-	step workflow.StepExecutor,
+	run *gorkflow.WorkflowRun,
+	step gorkflow.StepExecutor,
 	inputBytes []byte,
-	outputs workflow.StepOutputAccessor,
-	state workflow.StateAccessor,
+	outputs gorkflow.StepOutputAccessor,
+	state gorkflow.StateAccessor,
 ) (*StepExecutionResult, error) {
 	config := step.GetConfig()
 
 	// Create step execution record
-	stepExec := &workflow.StepExecution{
+	stepExec := &gorkflow.StepExecution{
 		RunID:          run.RunID,
 		StepID:         step.GetID(),
 		ExecutionIndex: 0,
-		Status:         workflow.StepStatusPending,
+		Status:         gorkflow.StepStatusPending,
 		Input:          inputBytes,
 		StartedAt:      nil,
 		CompletedAt:    nil,
@@ -51,7 +51,7 @@ func (e *Engine) executeStep(
 		Str("step_name", step.GetName()).
 		Logger()
 
-	stepCtx := &workflow.StepContext{
+	stepCtx := &gorkflow.StepContext{
 		Context: ctx,
 		RunID:   run.RunID,
 		StepID:  step.GetID(),
@@ -71,7 +71,7 @@ func (e *Engine) executeStep(
 
 		if attempt > 0 {
 			stepLogger.Warn().Int("attempt", attempt).Msg("Retrying step")
-			stepExec.Status = workflow.StepStatusRetrying
+			stepExec.Status = gorkflow.StepStatusRetrying
 			stepExec.Attempt = attempt
 			stepExec.UpdatedAt = time.Now()
 
@@ -88,7 +88,7 @@ func (e *Engine) executeStep(
 		}
 
 		// Update to running
-		stepExec.Status = workflow.StepStatusRunning
+		stepExec.Status = gorkflow.StepStatusRunning
 		now := time.Now()
 		stepExec.StartedAt = &now
 		stepExec.Attempt = attempt
@@ -125,7 +125,7 @@ func (e *Engine) executeStep(
 
 		if lastErr == nil {
 			// Success
-			stepExec.Status = workflow.StepStatusCompleted
+			stepExec.Status = gorkflow.StepStatusCompleted
 			stepExec.Output = outputBytes
 			completedAt := time.Now()
 			stepExec.CompletedAt = &completedAt
@@ -170,13 +170,13 @@ func (e *Engine) executeStep(
 	}
 
 	// All retries exhausted
-	stepExec.Status = workflow.StepStatusFailed
+	stepExec.Status = gorkflow.StepStatusFailed
 	completedAt := time.Now()
 	stepExec.CompletedAt = &completedAt
 	stepExec.UpdatedAt = completedAt
-	stepExec.Error = &workflow.StepError{
+	stepExec.Error = &gorkflow.StepError{
 		Message: lastErr.Error(),
-		Code:    workflow.ErrCodeExecutionFailed,
+		Code:    gorkflow.ErrCodeExecutionFailed,
 		Attempt: config.MaxRetries,
 	}
 

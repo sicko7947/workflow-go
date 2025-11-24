@@ -64,7 +64,7 @@ func TestNewDynamoDBStore(t *testing.T) {
 	}
 
 	// Verify it implements the interface
-	var _ workflow.WorkflowStore = store
+	var _ gorkflow.WorkflowStore = store
 }
 
 func TestDynamoDBStore_CreateRun(t *testing.T) {
@@ -81,11 +81,11 @@ func TestDynamoDBStore_CreateRun(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
 		ResourceID: "resource-1",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -157,10 +157,10 @@ func TestDynamoDBStore_CreateRun_Error(t *testing.T) {
 	store := NewDynamoDBStore(client, "test-table")
 	ctx := context.Background()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -184,7 +184,7 @@ func TestDynamoDBStore_GetRun(t *testing.T) {
 					"workflow_id":      &types.AttributeValueMemberS{Value: "test-workflow"},
 					"workflow_version": &types.AttributeValueMemberS{Value: ""},
 					"resource_id":      &types.AttributeValueMemberS{Value: ""},
-					"status":           &types.AttributeValueMemberS{Value: string(workflow.RunStatusPending)},
+					"status":           &types.AttributeValueMemberS{Value: string(gorkflow.RunStatusPending)},
 					"progress":         &types.AttributeValueMemberN{Value: "0"},
 					"created_at":       &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)},
 					"updated_at":       &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)},
@@ -206,8 +206,8 @@ func TestDynamoDBStore_GetRun(t *testing.T) {
 		t.Errorf("RunID = %s, want %s", run.RunID, runID)
 	}
 
-	if run.Status != workflow.RunStatusPending {
-		t.Errorf("Status = %s, want %s", run.Status, workflow.RunStatusPending)
+	if run.Status != gorkflow.RunStatusPending {
+		t.Errorf("Status = %s, want %s", run.Status, gorkflow.RunStatusPending)
 	}
 }
 
@@ -257,10 +257,10 @@ func TestDynamoDBStore_UpdateRun(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusRunning,
+		Status:     gorkflow.RunStatusRunning,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -299,7 +299,7 @@ func TestDynamoDBStore_UpdateRunStatus(t *testing.T) {
 				Item: map[string]types.AttributeValue{
 					"RunID":      &types.AttributeValueMemberS{Value: runID},
 					"WorkflowID": &types.AttributeValueMemberS{Value: "test-workflow"},
-					"Status":     &types.AttributeValueMemberS{Value: string(workflow.RunStatusRunning)},
+					"Status":     &types.AttributeValueMemberS{Value: string(gorkflow.RunStatusRunning)},
 					"CreatedAt":  &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)},
 					"UpdatedAt":  &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)},
 				},
@@ -314,12 +314,12 @@ func TestDynamoDBStore_UpdateRunStatus(t *testing.T) {
 	store := NewDynamoDBStore(client, "test-table")
 	ctx := context.Background()
 
-	wfErr := &workflow.WorkflowError{
+	wfErr := &gorkflow.WorkflowError{
 		Code:    "TEST_ERROR",
 		Message: "test error",
 	}
 
-	err := store.UpdateRunStatus(ctx, runID, workflow.RunStatusFailed, wfErr)
+	err := store.UpdateRunStatus(ctx, runID, gorkflow.RunStatusFailed, wfErr)
 	if err != nil {
 		t.Fatalf("UpdateRunStatus() failed: %v", err)
 	}
@@ -350,7 +350,7 @@ func TestDynamoDBStore_UpdateRunStatus_TerminalStatus(t *testing.T) {
 				Item: map[string]types.AttributeValue{
 					"RunID":      &types.AttributeValueMemberS{Value: runID},
 					"WorkflowID": &types.AttributeValueMemberS{Value: "test-workflow"},
-					"Status":     &types.AttributeValueMemberS{Value: string(workflow.RunStatusRunning)},
+					"Status":     &types.AttributeValueMemberS{Value: string(gorkflow.RunStatusRunning)},
 					"CreatedAt":  &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)},
 					"UpdatedAt":  &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)},
 				},
@@ -365,7 +365,7 @@ func TestDynamoDBStore_UpdateRunStatus_TerminalStatus(t *testing.T) {
 	ctx := context.Background()
 
 	// Test with terminal status (Completed)
-	err := store.UpdateRunStatus(ctx, runID, workflow.RunStatusCompleted, nil)
+	err := store.UpdateRunStatus(ctx, runID, gorkflow.RunStatusCompleted, nil)
 	if err != nil {
 		t.Fatalf("UpdateRunStatus() failed: %v", err)
 	}
@@ -377,7 +377,7 @@ func TestDynamoDBStore_ListRuns(t *testing.T) {
 	ctx := context.Background()
 
 	// ListRuns is not fully implemented (returns empty list)
-	runs, err := store.ListRuns(ctx, workflow.RunFilter{})
+	runs, err := store.ListRuns(ctx, gorkflow.RunFilter{})
 	if err != nil {
 		t.Fatalf("ListRuns() failed: %v", err)
 	}
@@ -400,10 +400,10 @@ func TestDynamoDBStore_CreateStepExecution(t *testing.T) {
 	store := NewDynamoDBStore(client, "test-table")
 	ctx := context.Background()
 
-	exec := &workflow.StepExecution{
+	exec := &gorkflow.StepExecution{
 		RunID:     "test-run-1",
 		StepID:    "step-1",
-		Status:    workflow.StepStatusPending,
+		Status:    gorkflow.StepStatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -448,7 +448,7 @@ func TestDynamoDBStore_GetStepExecution(t *testing.T) {
 					"run_id":          &types.AttributeValueMemberS{Value: runID},
 					"step_id":         &types.AttributeValueMemberS{Value: stepID},
 					"execution_index": &types.AttributeValueMemberN{Value: "0"},
-					"status":          &types.AttributeValueMemberS{Value: string(workflow.StepStatusPending)},
+					"status":          &types.AttributeValueMemberS{Value: string(gorkflow.StepStatusPending)},
 					"duration_ms":     &types.AttributeValueMemberN{Value: "0"},
 					"created_at":      &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)},
 					"updated_at":      &types.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)},
@@ -500,10 +500,10 @@ func TestDynamoDBStore_UpdateStepExecution(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
-	exec := &workflow.StepExecution{
+	exec := &gorkflow.StepExecution{
 		RunID:     "test-run-1",
 		StepID:    "step-1",
-		Status:    workflow.StepStatusCompleted,
+		Status:    gorkflow.StepStatusCompleted,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -533,14 +533,14 @@ func TestDynamoDBStore_ListStepExecutions(t *testing.T) {
 					{
 						"RunID":     &types.AttributeValueMemberS{Value: runID},
 						"StepID":    &types.AttributeValueMemberS{Value: "step-1"},
-						"Status":    &types.AttributeValueMemberS{Value: string(workflow.StepStatusPending)},
+						"Status":    &types.AttributeValueMemberS{Value: string(gorkflow.StepStatusPending)},
 						"CreatedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339Nano)},
 						"UpdatedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339Nano)},
 					},
 					{
 						"RunID":     &types.AttributeValueMemberS{Value: runID},
 						"StepID":    &types.AttributeValueMemberS{Value: "step-2"},
-						"Status":    &types.AttributeValueMemberS{Value: string(workflow.StepStatusCompleted)},
+						"Status":    &types.AttributeValueMemberS{Value: string(gorkflow.StepStatusCompleted)},
 						"CreatedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339Nano)},
 						"UpdatedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339Nano)},
 					},
@@ -893,7 +893,7 @@ func TestDynamoDBStore_CountRunsByStatus(t *testing.T) {
 	store := NewDynamoDBStore(client, "test-table")
 	ctx := context.Background()
 
-	count, err := store.CountRunsByStatus(ctx, "resource-1", workflow.RunStatusPending)
+	count, err := store.CountRunsByStatus(ctx, "resource-1", gorkflow.RunStatusPending)
 	if err != nil {
 		t.Fatalf("CountRunsByStatus() failed: %v", err)
 	}
@@ -913,7 +913,7 @@ func TestDynamoDBStore_CountRunsByStatus_Error(t *testing.T) {
 	store := NewDynamoDBStore(client, "test-table")
 	ctx := context.Background()
 
-	_, err := store.CountRunsByStatus(ctx, "resource-1", workflow.RunStatusPending)
+	_, err := store.CountRunsByStatus(ctx, "resource-1", gorkflow.RunStatusPending)
 	if err == nil {
 		t.Error("CountRunsByStatus() should have failed with DynamoDB error")
 	}

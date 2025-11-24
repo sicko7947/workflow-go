@@ -3,12 +3,12 @@ package builder
 import (
 	"fmt"
 
-	workflow "github.com/sicko7947/gorkflow"
+	"github.com/sicko7947/gorkflow"
 )
 
 // WorkflowBuilder provides a fluent API for building workflows
 type WorkflowBuilder struct {
-	workflow     *workflow.Workflow
+	workflow     *gorkflow.Workflow
 	lastStepIDs  []string
 	currentChain []string
 }
@@ -16,7 +16,7 @@ type WorkflowBuilder struct {
 // NewWorkflow creates a new workflow builder
 func NewWorkflow(id, name string) *WorkflowBuilder {
 	return &WorkflowBuilder{
-		workflow:     workflow.NewWorkflowInstance(id, name),
+		workflow:     gorkflow.NewWorkflowInstance(id, name),
 		lastStepIDs:  []string{},
 		currentChain: []string{},
 	}
@@ -35,7 +35,7 @@ func (b *WorkflowBuilder) WithVersion(version string) *WorkflowBuilder {
 }
 
 // WithConfig sets the default execution config
-func (b *WorkflowBuilder) WithConfig(config workflow.ExecutionConfig) *WorkflowBuilder {
+func (b *WorkflowBuilder) WithConfig(config gorkflow.ExecutionConfig) *WorkflowBuilder {
 	b.workflow.SetConfig(config)
 	return b
 }
@@ -47,13 +47,13 @@ func (b *WorkflowBuilder) WithTags(tags map[string]string) *WorkflowBuilder {
 }
 
 // ThenStep chains the given step after the last added step
-func (b *WorkflowBuilder) ThenStep(step workflow.StepExecutor) *WorkflowBuilder {
+func (b *WorkflowBuilder) ThenStep(step gorkflow.StepExecutor) *WorkflowBuilder {
 	stepID := step.GetID()
 
 	// Register step if not already registered
 	if _, err := b.workflow.GetStep(stepID); err != nil {
 		b.workflow.AddStep(step)
-		b.workflow.Graph().AddNode(stepID, workflow.NodeTypeSequential)
+		b.workflow.Graph().AddNode(stepID, gorkflow.NodeTypeSequential)
 	}
 
 	// Chain from last steps
@@ -70,7 +70,7 @@ func (b *WorkflowBuilder) ThenStep(step workflow.StepExecutor) *WorkflowBuilder 
 }
 
 // Parallel adds multiple steps that execute in parallel after the last step(s)
-func (b *WorkflowBuilder) Parallel(steps ...workflow.StepExecutor) *WorkflowBuilder {
+func (b *WorkflowBuilder) Parallel(steps ...gorkflow.StepExecutor) *WorkflowBuilder {
 	var newLastIDs []string
 	for _, step := range steps {
 		stepID := step.GetID()
@@ -78,7 +78,7 @@ func (b *WorkflowBuilder) Parallel(steps ...workflow.StepExecutor) *WorkflowBuil
 		// Register step if not already registered
 		if _, err := b.workflow.GetStep(stepID); err != nil {
 			b.workflow.AddStep(step)
-			b.workflow.Graph().AddNode(stepID, workflow.NodeTypeParallel)
+			b.workflow.Graph().AddNode(stepID, gorkflow.NodeTypeParallel)
 		}
 
 		// Chain from last steps
@@ -97,7 +97,7 @@ func (b *WorkflowBuilder) Parallel(steps ...workflow.StepExecutor) *WorkflowBuil
 }
 
 // Sequence adds multiple steps and chains them together in order
-func (b *WorkflowBuilder) Sequence(steps ...workflow.StepExecutor) *WorkflowBuilder {
+func (b *WorkflowBuilder) Sequence(steps ...gorkflow.StepExecutor) *WorkflowBuilder {
 	for _, step := range steps {
 		b.ThenStep(step)
 	}
@@ -110,15 +110,15 @@ func (b *WorkflowBuilder) Sequence(steps ...workflow.StepExecutor) *WorkflowBuil
 //
 // Example:
 //
-//	condition := func(ctx *workflow.StepContext) (bool, error) {
+//	condition := func(ctx *gorkflow.StepContext) (bool, error) {
 //	    var shouldProcess bool
 //	    ctx.State.Get("should_process", &shouldProcess)
 //	    return shouldProcess, nil
 //	}
 //	builder.ThenStepIf(processStep, condition, nil)
-func (b *WorkflowBuilder) ThenStepIf(step workflow.StepExecutor, condition workflow.Condition, defaultValue any) *WorkflowBuilder {
+func (b *WorkflowBuilder) ThenStepIf(step gorkflow.StepExecutor, condition gorkflow.Condition, defaultValue any) *WorkflowBuilder {
 	// Wrap the step in a conditional wrapper
-	wrappedStep := workflow.WrapStepWithCondition(step, condition, defaultValue)
+	wrappedStep := gorkflow.WrapStepWithCondition(step, condition, defaultValue)
 	return b.ThenStep(wrappedStep)
 }
 
@@ -131,7 +131,7 @@ func (b *WorkflowBuilder) SetEntryPoint(stepID string) *WorkflowBuilder {
 }
 
 // Build finalizes and validates the workflow
-func (b *WorkflowBuilder) Build() (*workflow.Workflow, error) {
+func (b *WorkflowBuilder) Build() (*gorkflow.Workflow, error) {
 	// Validate graph
 	if err := b.workflow.Graph().Validate(); err != nil {
 		return nil, fmt.Errorf("invalid workflow graph: %w", err)
@@ -148,7 +148,7 @@ func (b *WorkflowBuilder) Build() (*workflow.Workflow, error) {
 }
 
 // MustBuild finalizes and validates the workflow, panics on error
-func (b *WorkflowBuilder) MustBuild() *workflow.Workflow {
+func (b *WorkflowBuilder) MustBuild() *gorkflow.Workflow {
 	wf, err := b.Build()
 	if err != nil {
 		panic(fmt.Sprintf("failed to build workflow: %v", err))

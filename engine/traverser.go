@@ -3,16 +3,16 @@ package engine
 import (
 	"fmt"
 
-	workflow "github.com/sicko7947/gorkflow"
+	"github.com/sicko7947/gorkflow"
 )
 
 // GraphTraverser handles traversal of the execution graph
 type GraphTraverser struct {
-	graph *workflow.ExecutionGraph
+	graph *gorkflow.ExecutionGraph
 }
 
 // NewGraphTraverser creates a new graph traverser
-func NewGraphTraverser(graph *workflow.ExecutionGraph) *GraphTraverser {
+func NewGraphTraverser(graph *gorkflow.ExecutionGraph) *GraphTraverser {
 	return &GraphTraverser{
 		graph: graph,
 	}
@@ -41,7 +41,7 @@ func (t *GraphTraverser) IsParallel(stepID string) bool {
 		return false
 	}
 
-	return node.Type == workflow.NodeTypeParallel
+	return node.Type == gorkflow.NodeTypeParallel
 }
 
 // HasConditions checks if a step has conditional execution
@@ -51,5 +51,5 @@ func (t *GraphTraverser) HasConditions(stepID string) bool {
 		return false
 	}
 
-	return node.Type == workflow.NodeTypeConditional && len(node.Conditions) > 0
+	return node.Type == gorkflow.NodeTypeConditional && len(node.Conditions) > 0
 }

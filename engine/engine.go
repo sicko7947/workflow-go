@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-	workflow "github.com/sicko7947/gorkflow"
+	"github.com/sicko7947/gorkflow"
 )
 
 // Engine orchestrates workflow execution
 type Engine struct {
-	store  workflow.WorkflowStore
+	store  gorkflow.WorkflowStore
 	logger zerolog.Logger
 	config EngineConfig
 }
@@ -52,7 +52,7 @@ func WithConfig(config EngineConfig) EngineOption {
 // NewEngine creates a new workflow engine with optional configuration
 // If no logger is provided, a default stdout logger with Info level is used
 // If no config is provided, DefaultEngineConfig is used
-func NewEngine(store workflow.WorkflowStore, opts ...EngineOption) *Engine {
+func NewEngine(store gorkflow.WorkflowStore, opts ...EngineOption) *Engine {
 	// Default logger: stdout, Info level
 	defaultLogger := zerolog.New(os.Stdout).
 		With().
@@ -77,12 +77,12 @@ func NewEngine(store workflow.WorkflowStore, opts ...EngineOption) *Engine {
 // StartWorkflow initiates a workflow execution
 func (e *Engine) StartWorkflow(
 	ctx context.Context,
-	wf *workflow.Workflow,
+	wf *gorkflow.Workflow,
 	input interface{},
-	opts ...workflow.StartOption,
+	opts ...gorkflow.StartOption,
 ) (string, error) {
 	// Apply options
-	options := &workflow.StartOptions{}
+	options := &gorkflow.StartOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -98,17 +98,17 @@ func (e *Engine) StartWorkflow(
 
 	// Create workflow run
 	now := time.Now()
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:           runID,
 		WorkflowID:      wf.ID(),
 		WorkflowVersion: wf.Version(),
-		Status:          workflow.RunStatusPending,
+		Status:          gorkflow.RunStatusPending,
 		Progress:        0.0,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 		Input:           inputBytes,
 		ResourceID:      options.ResourceID,
-		Trigger: &workflow.TriggerInfo{
+		Trigger: &gorkflow.TriggerInfo{
 			Type:      options.TriggerType,
 			Source:    options.TriggerSource,
 			Timestamp: now,
@@ -143,7 +143,7 @@ func (e *Engine) StartWorkflow(
 }
 
 // executeWorkflow runs the workflow (called asynchronously)
-func (e *Engine) executeWorkflow(ctx context.Context, wf *workflow.Workflow, run *workflow.WorkflowRun) error {
+func (e *Engine) executeWorkflow(ctx context.Context, wf *gorkflow.Workflow, run *gorkflow.WorkflowRun) error {
 	workflowLogger := e.logger.With().
 		Str("run_id", run.RunID).
 		Str("workflow_id", run.WorkflowID).
@@ -153,7 +153,7 @@ func (e *Engine) executeWorkflow(ctx context.Context, wf *workflow.Workflow, run
 
 	// Update status to running
 	startTime := time.Now()
-	run.Status = workflow.RunStatusRunning
+	run.Status = gorkflow.RunStatusRunning
 	run.StartedAt = &startTime
 	run.UpdatedAt = startTime
 
@@ -163,8 +163,8 @@ func (e *Engine) executeWorkflow(ctx context.Context, wf *workflow.Workflow, run
 	}
 
 	// Build execution context - create accessors for state and outputs
-	outputs := workflow.NewStepOutputAccessor(run.RunID, e.store)
-	state := workflow.NewStateAccessor(run.RunID, e.store)
+	outputs := gorkflow.NewStepOutputAccessor(run.RunID, e.store)
+	state := gorkflow.NewStateAccessor(run.RunID, e.store)
 
 	// Get execution order from graph
 	graph := wf.Graph()
@@ -276,9 +276,9 @@ func (e *Engine) executeWorkflow(ctx context.Context, wf *workflow.Workflow, run
 }
 
 // completeWorkflow marks workflow as completed
-func (e *Engine) completeWorkflow(ctx context.Context, run *workflow.WorkflowRun) error {
+func (e *Engine) completeWorkflow(ctx context.Context, run *gorkflow.WorkflowRun) error {
 	completedAt := time.Now()
-	run.Status = workflow.RunStatusCompleted
+	run.Status = gorkflow.RunStatusCompleted
 	run.Progress = 1.0
 	run.CompletedAt = &completedAt
 	run.UpdatedAt = completedAt
@@ -297,14 +297,14 @@ func (e *Engine) completeWorkflow(ctx context.Context, run *workflow.WorkflowRun
 }
 
 // failWorkflow marks workflow as failed
-func (e *Engine) failWorkflow(ctx context.Context, run *workflow.WorkflowRun, err error) error {
+func (e *Engine) failWorkflow(ctx context.Context, run *gorkflow.WorkflowRun, err error) error {
 	completedAt := time.Now()
-	run.Status = workflow.RunStatusFailed
+	run.Status = gorkflow.RunStatusFailed
 	run.CompletedAt = &completedAt
 	run.UpdatedAt = completedAt
-	run.Error = &workflow.WorkflowError{
+	run.Error = &gorkflow.WorkflowError{
 		Message:   err.Error(),
-		Code:      workflow.ErrCodeExecutionFailed,
+		Code:      gorkflow.ErrCodeExecutionFailed,
 		Timestamp: completedAt,
 	}
 
@@ -321,9 +321,9 @@ func (e *Engine) failWorkflow(ctx context.Context, run *workflow.WorkflowRun, er
 }
 
 // cancelWorkflow marks workflow as cancelled
-func (e *Engine) cancelWorkflow(ctx context.Context, run *workflow.WorkflowRun) error {
+func (e *Engine) cancelWorkflow(ctx context.Context, run *gorkflow.WorkflowRun) error {
 	completedAt := time.Now()
-	run.Status = workflow.RunStatusCancelled
+	run.Status = gorkflow.RunStatusCancelled
 	run.CompletedAt = &completedAt
 	run.UpdatedAt = completedAt
 
@@ -339,12 +339,12 @@ func (e *Engine) cancelWorkflow(ctx context.Context, run *workflow.WorkflowRun) 
 }
 
 // GetRun retrieves workflow run status
-func (e *Engine) GetRun(ctx context.Context, runID string) (*workflow.WorkflowRun, error) {
+func (e *Engine) GetRun(ctx context.Context, runID string) (*gorkflow.WorkflowRun, error) {
 	return e.store.GetRun(ctx, runID)
 }
 
 // GetStepExecutions retrieves all step executions for a run
-func (e *Engine) GetStepExecutions(ctx context.Context, runID string) ([]*workflow.StepExecution, error) {
+func (e *Engine) GetStepExecutions(ctx context.Context, runID string) ([]*gorkflow.StepExecution, error) {
 	return e.store.ListStepExecutions(ctx, runID)
 }
 
@@ -363,6 +363,6 @@ func (e *Engine) Cancel(ctx context.Context, runID string) error {
 }
 
 // ListRuns lists workflow runs with filtering
-func (e *Engine) ListRuns(ctx context.Context, filter workflow.RunFilter) ([]*workflow.WorkflowRun, error) {
+func (e *Engine) ListRuns(ctx context.Context, filter gorkflow.RunFilter) ([]*gorkflow.WorkflowRun, error) {
 	return e.store.ListRuns(ctx, filter)
 }

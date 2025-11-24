@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/sicko7947/gorkflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -114,11 +113,11 @@ func TestIntegration_CreateAndGetRun(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-1",
 		WorkflowID: "test-workflow",
 		ResourceID: "resource-1",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -144,11 +143,11 @@ func TestIntegration_UpdateRunWithTransaction(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      "test-run-2",
 		WorkflowID: "test-workflow",
 		ResourceID: "resource-1",
-		Status:     workflow.RunStatusPending,
+		Status:     gorkflow.RunStatusPending,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -158,14 +157,14 @@ func TestIntegration_UpdateRunWithTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update run status (uses transaction)
-	run.Status = workflow.RunStatusRunning
+	run.Status = gorkflow.RunStatusRunning
 	err = store.UpdateRun(ctx, run)
 	require.NoError(t, err)
 
 	// Verify update
 	retrieved, err := store.GetRun(ctx, run.RunID)
 	require.NoError(t, err)
-	assert.Equal(t, workflow.RunStatusRunning, retrieved.Status)
+	assert.Equal(t, gorkflow.RunStatusRunning, retrieved.Status)
 }
 
 func TestIntegration_ListStepExecutions_Pagination(t *testing.T) {
@@ -176,10 +175,10 @@ func TestIntegration_ListStepExecutions_Pagination(t *testing.T) {
 	runID := "test-run-pagination"
 
 	// Create run first
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      runID,
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusRunning,
+		Status:     gorkflow.RunStatusRunning,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -188,10 +187,10 @@ func TestIntegration_ListStepExecutions_Pagination(t *testing.T) {
 
 	// Create 15 step executions (more than typical page size)
 	for i := 0; i < 15; i++ {
-		exec := &workflow.StepExecution{
+		exec := &gorkflow.StepExecution{
 			RunID:     runID,
 			StepID:    fmt.Sprintf("step-%02d", i),
-			Status:    workflow.StepStatusCompleted,
+			Status:    gorkflow.StepStatusCompleted,
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
@@ -213,10 +212,10 @@ func TestIntegration_GetAllState_Pagination(t *testing.T) {
 	runID := "test-run-state"
 
 	// Create run first
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      runID,
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusRunning,
+		Status:     gorkflow.RunStatusRunning,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -245,15 +244,15 @@ func TestIntegration_CountRunsByStatus_WithGSI2(t *testing.T) {
 	resourceID := "resource-test"
 
 	// Create runs with different statuses
-	statuses := []workflow.RunStatus{
-		workflow.RunStatusPending,
-		workflow.RunStatusPending,
-		workflow.RunStatusRunning,
-		workflow.RunStatusCompleted,
+	statuses := []gorkflow.RunStatus{
+		gorkflow.RunStatusPending,
+		gorkflow.RunStatusPending,
+		gorkflow.RunStatusRunning,
+		gorkflow.RunStatusCompleted,
 	}
 
 	for i, status := range statuses {
-		run := &workflow.WorkflowRun{
+		run := &gorkflow.WorkflowRun{
 			RunID:      fmt.Sprintf("run-%d", i),
 			WorkflowID: "test-workflow",
 			ResourceID: resourceID,
@@ -269,17 +268,17 @@ func TestIntegration_CountRunsByStatus_WithGSI2(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Count pending runs
-	count, err := store.CountRunsByStatus(ctx, resourceID, workflow.RunStatusPending)
+	count, err := store.CountRunsByStatus(ctx, resourceID, gorkflow.RunStatusPending)
 	require.NoError(t, err, "Failed to count pending runs")
 	assert.Equal(t, 2, count, "Should have 2 pending runs")
 
 	// Count running runs
-	count, err = store.CountRunsByStatus(ctx, resourceID, workflow.RunStatusRunning)
+	count, err = store.CountRunsByStatus(ctx, resourceID, gorkflow.RunStatusRunning)
 	require.NoError(t, err, "Failed to count running runs")
 	assert.Equal(t, 1, count, "Should have 1 running run")
 
 	// Count completed runs
-	count, err = store.CountRunsByStatus(ctx, resourceID, workflow.RunStatusCompleted)
+	count, err = store.CountRunsByStatus(ctx, resourceID, gorkflow.RunStatusCompleted)
 	require.NoError(t, err, "Failed to count completed runs")
 	assert.Equal(t, 1, count, "Should have 1 completed run")
 }
@@ -293,10 +292,10 @@ func TestIntegration_StepOutputOperations(t *testing.T) {
 	stepID := "step-1"
 
 	// Create run first
-	run := &workflow.WorkflowRun{
+	run := &gorkflow.WorkflowRun{
 		RunID:      runID,
 		WorkflowID: "test-workflow",
-		Status:     workflow.RunStatusRunning,
+		Status:     gorkflow.RunStatusRunning,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}

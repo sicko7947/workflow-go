@@ -3,15 +3,15 @@ package conditional
 import (
 	"fmt"
 
-	workflow "github.com/sicko7947/gorkflow"
+	"github.com/sicko7947/gorkflow"
 	"github.com/sicko7947/gorkflow/builder"
 )
 
 // NewConditionalWorkflow demonstrates conditional step execution using ThenStepIf
 // This workflow conditionally executes steps based on input flags
-func NewConditionalWorkflow() (*workflow.Workflow, error) {
+func NewConditionalWorkflow() (*gorkflow.Workflow, error) {
 	// Condition: Only double if EnableDoubling flag is true in state
-	shouldDouble := func(ctx *workflow.StepContext) (bool, error) {
+	shouldDouble := func(ctx *gorkflow.StepContext) (bool, error) {
 		var enableDoubling bool
 		if err := ctx.State.Get("enable_doubling", &enableDoubling); err != nil {
 			ctx.Logger.Warn().Err(err).Msg("Failed to get enable_doubling from state, defaulting to false")
@@ -23,7 +23,7 @@ func NewConditionalWorkflow() (*workflow.Workflow, error) {
 	}
 
 	// Condition: Only format if EnableFormatting flag is true in state
-	shouldFormat := func(ctx *workflow.StepContext) (bool, error) {
+	shouldFormat := func(ctx *gorkflow.StepContext) (bool, error) {
 		var enableFormatting bool
 		if err := ctx.State.Get("enable_formatting", &enableFormatting); err != nil {
 			ctx.Logger.Warn().Err(err).Msg("Failed to get enable_formatting from state, defaulting to false")
@@ -45,7 +45,7 @@ func NewConditionalWorkflow() (*workflow.Workflow, error) {
 	wf, err := builder.NewWorkflow("conditional_example", "Conditional Execution Example").
 		WithDescription("Demonstrates conditional step execution with ThenStepIf").
 		WithVersion("1.0").
-		WithConfig(workflow.ExecutionConfig{
+		WithConfig(gorkflow.ExecutionConfig{
 			MaxRetries:     2,
 			RetryDelayMs:   1000,
 			TimeoutSeconds: 10,

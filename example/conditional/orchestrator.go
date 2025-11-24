@@ -6,20 +6,20 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	workflow "github.com/sicko7947/gorkflow"
+	"github.com/sicko7947/gorkflow"
 	"github.com/sicko7947/gorkflow/engine"
 )
 
 // Orchestrator handles the execution of conditional workflows
 type Orchestrator struct {
-	workflow *workflow.Workflow
+	workflow *gorkflow.Workflow
 	engine   *engine.Engine
 	logger   zerolog.Logger
 }
 
 // NewOrchestrator creates a new conditional workflow orchestrator
 func NewOrchestrator(
-	store workflow.WorkflowStore,
+	store gorkflow.WorkflowStore,
 	logger zerolog.Logger,
 	config engine.EngineConfig,
 ) (*Orchestrator, error) {
@@ -58,7 +58,7 @@ func (o *Orchestrator) StartWorkflow(
 		ctx,
 		o.workflow,
 		input,
-		workflow.WithTags(map[string]string{
+		gorkflow.WithTags(map[string]string{
 			"type": "conditional",
 		}),
 	)
@@ -97,7 +97,7 @@ func (o *Orchestrator) GetWorkflowStatus(
 	}
 
 	// If completed, parse output
-	if run.Status == workflow.RunStatusCompleted && len(run.Output) > 0 {
+	if run.Status == gorkflow.RunStatusCompleted && len(run.Output) > 0 {
 		var output ConditionalFormatOutput
 		if err := json.Unmarshal(run.Output, &output); err != nil {
 			o.logger.Warn().
@@ -119,7 +119,7 @@ func (o *Orchestrator) CancelWorkflow(ctx context.Context, runID string) error {
 
 // WorkflowStatus represents the current status of a conditional workflow run
 type WorkflowStatus struct {
-	*workflow.WorkflowRun
-	StepExecutions []*workflow.StepExecution `json:"stepExecutions,omitempty"`
+	*gorkflow.WorkflowRun
+	StepExecutions []*gorkflow.StepExecution `json:"stepExecutions,omitempty"`
 	Output         *ConditionalFormatOutput  `json:"output,omitempty"`
 }

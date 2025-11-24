@@ -3,13 +3,13 @@ package builder
 import (
 	"testing"
 
-	workflow "github.com/sicko7947/gorkflow"
+	"github.com/sicko7947/gorkflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // Test handler
-func testHandler(ctx *workflow.StepContext, input interface{}) (interface{}, error) {
+func testHandler(ctx *gorkflow.StepContext, input interface{}) (interface{}, error) {
 	return input, nil
 }
 
@@ -27,7 +27,7 @@ func TestNewWorkflow(t *testing.T) {
 func TestWorkflowBuilder_WithDescription(t *testing.T) {
 	wf, err := NewWorkflow("test-workflow", "Test Workflow").
 		WithDescription("A test workflow").
-		ThenStep(workflow.NewStep("step1", "Step 1", testHandler)).
+		ThenStep(gorkflow.NewStep("step1", "Step 1", testHandler)).
 		Build()
 
 	require.NoError(t, err)
@@ -37,7 +37,7 @@ func TestWorkflowBuilder_WithDescription(t *testing.T) {
 func TestWorkflowBuilder_WithVersion(t *testing.T) {
 	wf, err := NewWorkflow("test-workflow", "Test Workflow").
 		WithVersion("1.0.0").
-		ThenStep(workflow.NewStep("step1", "Step 1", testHandler)).
+		ThenStep(gorkflow.NewStep("step1", "Step 1", testHandler)).
 		Build()
 
 	require.NoError(t, err)
@@ -45,15 +45,15 @@ func TestWorkflowBuilder_WithVersion(t *testing.T) {
 }
 
 func TestWorkflowBuilder_WithDefaultConfig(t *testing.T) {
-	config := workflow.ExecutionConfig{
+	config := gorkflow.ExecutionConfig{
 		MaxRetries:     5,
 		TimeoutSeconds: 60,
-		RetryBackoff:   workflow.BackoffExponential,
+		RetryBackoff:   gorkflow.BackoffExponential,
 	}
 
 	wf, err := NewWorkflow("test-workflow", "Test Workflow").
 		WithConfig(config).
-		ThenStep(workflow.NewStep("step1", "Step 1", testHandler)).
+		ThenStep(gorkflow.NewStep("step1", "Step 1", testHandler)).
 		Build()
 
 	require.NoError(t, err)
@@ -61,8 +61,8 @@ func TestWorkflowBuilder_WithDefaultConfig(t *testing.T) {
 }
 
 func TestWorkflowBuilder_Sequence(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
-	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
+	step2 := gorkflow.NewStep("step2", "Step 2", testHandler)
 
 	wf, err := NewWorkflow("test-workflow", "Test Workflow").
 		Sequence(step1, step2).
@@ -89,8 +89,8 @@ func TestWorkflowBuilder_Sequence(t *testing.T) {
 }
 
 func TestWorkflowBuilder_ThenStep(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
-	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
+	step2 := gorkflow.NewStep("step2", "Step 2", testHandler)
 
 	wf, err := NewWorkflow("test-workflow", "Test Workflow").
 		ThenStep(step1).
@@ -107,8 +107,8 @@ func TestWorkflowBuilder_ThenStep(t *testing.T) {
 }
 
 func TestWorkflowBuilder_SetEntryPoint(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
-	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
+	step2 := gorkflow.NewStep("step2", "Step 2", testHandler)
 
 	wf, err := NewWorkflow("test-workflow", "Test Workflow").
 		ThenStep(step2).
@@ -121,8 +121,8 @@ func TestWorkflowBuilder_SetEntryPoint(t *testing.T) {
 }
 
 func TestWorkflowBuilder_AutoEntryPoint(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
-	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
+	step2 := gorkflow.NewStep("step2", "Step 2", testHandler)
 
 	wf, err := NewWorkflow("test-workflow", "Test Workflow").
 		ThenStep(step1).
@@ -143,7 +143,7 @@ func TestWorkflowBuilder_Build_EmptyWorkflow(t *testing.T) {
 }
 
 func TestWorkflowBuilder_Build_NoEntryPoint(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
 
 	wf, err := NewWorkflow("test-workflow", "Test Workflow").
 		ThenStep(step1).
@@ -155,8 +155,8 @@ func TestWorkflowBuilder_Build_NoEntryPoint(t *testing.T) {
 }
 
 func TestWorkflowBuilder_Build_InvalidGraph(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
-	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
+	step2 := gorkflow.NewStep("step2", "Step 2", testHandler)
 
 	// Create a cycle: step1 -> step2 -> step1
 	_, err := NewWorkflow("test-workflow", "Test Workflow").
@@ -170,7 +170,7 @@ func TestWorkflowBuilder_Build_InvalidGraph(t *testing.T) {
 }
 
 func TestWorkflowBuilder_MustBuild_Success(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
 
 	wf := NewWorkflow("test-workflow", "Test Workflow").
 		ThenStep(step1).
@@ -195,7 +195,7 @@ func TestWorkflowBuilder_WithTags(t *testing.T) {
 
 	wf, err := NewWorkflow("test-workflow", "Test Workflow").
 		WithTags(tags).
-		ThenStep(workflow.NewStep("step1", "Step 1", testHandler)).
+		ThenStep(gorkflow.NewStep("step1", "Step 1", testHandler)).
 		Build()
 
 	require.NoError(t, err)
@@ -203,10 +203,10 @@ func TestWorkflowBuilder_WithTags(t *testing.T) {
 }
 
 func TestWorkflowBuilder_Parallel(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
-	step2a := workflow.NewStep("step2a", "Step 2a", testHandler)
-	step2b := workflow.NewStep("step2b", "Step 2b", testHandler)
-	step3 := workflow.NewStep("step3", "Step 3", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
+	step2a := gorkflow.NewStep("step2a", "Step 2a", testHandler)
+	step2b := gorkflow.NewStep("step2b", "Step 2b", testHandler)
+	step3 := gorkflow.NewStep("step3", "Step 3", testHandler)
 
 	wf, err := NewWorkflow("test-workflow", "Test Workflow").
 		ThenStep(step1).
@@ -236,20 +236,20 @@ func TestWorkflowBuilder_Parallel(t *testing.T) {
 
 	// Check node types
 	node2a := graph.Nodes["step2a"]
-	assert.Equal(t, workflow.NodeTypeParallel, node2a.Type)
+	assert.Equal(t, gorkflow.NodeTypeParallel, node2a.Type)
 
 	node2b := graph.Nodes["step2b"]
-	assert.Equal(t, workflow.NodeTypeParallel, node2b.Type)
+	assert.Equal(t, gorkflow.NodeTypeParallel, node2b.Type)
 
 	node1 := graph.Nodes["step1"]
-	assert.Equal(t, workflow.NodeTypeSequential, node1.Type)
+	assert.Equal(t, gorkflow.NodeTypeSequential, node1.Type)
 }
 
 func TestWorkflowBuilder_ThenStepIf(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
-	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
+	step2 := gorkflow.NewStep("step2", "Step 2", testHandler)
 
-	condition := func(ctx *workflow.StepContext) (bool, error) {
+	condition := func(ctx *gorkflow.StepContext) (bool, error) {
 		return true, nil
 	}
 
@@ -273,11 +273,11 @@ func TestWorkflowBuilder_ThenStepIf(t *testing.T) {
 }
 
 func TestWorkflowBuilder_ThenStepIf_WithDefaultValue(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
-	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
+	step2 := gorkflow.NewStep("step2", "Step 2", testHandler)
 
 	defaultValue := "default output"
-	condition := func(ctx *workflow.StepContext) (bool, error) {
+	condition := func(ctx *gorkflow.StepContext) (bool, error) {
 		return false, nil
 	}
 
@@ -296,11 +296,11 @@ func TestWorkflowBuilder_ThenStepIf_WithDefaultValue(t *testing.T) {
 }
 
 func TestWorkflowBuilder_ThenStepIf_ConditionFailure(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
-	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
+	step2 := gorkflow.NewStep("step2", "Step 2", testHandler)
 
 	// Condition that returns an error
-	condition := func(ctx *workflow.StepContext) (bool, error) {
+	condition := func(ctx *gorkflow.StepContext) (bool, error) {
 		return false, assert.AnError
 	}
 
@@ -314,16 +314,16 @@ func TestWorkflowBuilder_ThenStepIf_ConditionFailure(t *testing.T) {
 }
 
 func TestWorkflowBuilder_MultipleConditionalSteps(t *testing.T) {
-	step1 := workflow.NewStep("step1", "Step 1", testHandler)
-	step2 := workflow.NewStep("step2", "Step 2", testHandler)
-	step3 := workflow.NewStep("step3", "Step 3", testHandler)
-	step4 := workflow.NewStep("step4", "Step 4", testHandler)
+	step1 := gorkflow.NewStep("step1", "Step 1", testHandler)
+	step2 := gorkflow.NewStep("step2", "Step 2", testHandler)
+	step3 := gorkflow.NewStep("step3", "Step 3", testHandler)
+	step4 := gorkflow.NewStep("step4", "Step 4", testHandler)
 
-	condition1 := func(ctx *workflow.StepContext) (bool, error) {
+	condition1 := func(ctx *gorkflow.StepContext) (bool, error) {
 		return true, nil
 	}
 
-	condition2 := func(ctx *workflow.StepContext) (bool, error) {
+	condition2 := func(ctx *gorkflow.StepContext) (bool, error) {
 		return false, nil
 	}
 

@@ -12,14 +12,14 @@ import (
 	"github.com/sicko7947/gorkflow"
 )
 
-// DynamoDBStore implements workflow.WorkflowStore using AWS DynamoDB
+// DynamoDBStore implements gorkflow.WorkflowStore using AWS DynamoDB
 type DynamoDBStore struct {
 	client    DynamoDBClient
 	tableName string
 }
 
 // NewDynamoDBStore creates a new DynamoDB-backed workflow store
-func NewDynamoDBStore(client DynamoDBClient, tableName string) workflow.WorkflowStore {
+func NewDynamoDBStore(client DynamoDBClient, tableName string) gorkflow.WorkflowStore {
 	return &DynamoDBStore{
 		client:    client,
 		tableName: tableName,
@@ -28,7 +28,7 @@ func NewDynamoDBStore(client DynamoDBClient, tableName string) workflow.Workflow
 
 // Workflow run operations
 
-func (s *DynamoDBStore) CreateRun(ctx context.Context, run *workflow.WorkflowRun) error {
+func (s *DynamoDBStore) CreateRun(ctx context.Context, run *gorkflow.WorkflowRun) error {
 	// Marshal the run
 	item, err := attributevalue.MarshalMap(run)
 	if err != nil {
@@ -71,7 +71,7 @@ func (s *DynamoDBStore) CreateRun(ctx context.Context, run *workflow.WorkflowRun
 	return nil
 }
 
-func (s *DynamoDBStore) GetRun(ctx context.Context, runID string) (*workflow.WorkflowRun, error) {
+func (s *DynamoDBStore) GetRun(ctx context.Context, runID string) (*gorkflow.WorkflowRun, error) {
 	result, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
@@ -87,7 +87,7 @@ func (s *DynamoDBStore) GetRun(ctx context.Context, runID string) (*workflow.Wor
 		return nil, fmt.Errorf("workflow run %s not found", runID)
 	}
 
-	var run workflow.WorkflowRun
+	var run gorkflow.WorkflowRun
 	if err := attributevalue.UnmarshalMap(result.Item, &run); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal workflow run: %w", err)
 	}
@@ -95,7 +95,7 @@ func (s *DynamoDBStore) GetRun(ctx context.Context, runID string) (*workflow.Wor
 	return &run, nil
 }
 
-func (s *DynamoDBStore) UpdateRun(ctx context.Context, run *workflow.WorkflowRun) error {
+func (s *DynamoDBStore) UpdateRun(ctx context.Context, run *gorkflow.WorkflowRun) error {
 	run.UpdatedAt = time.Now()
 
 	// Marshal the run
@@ -146,7 +146,7 @@ func (s *DynamoDBStore) UpdateRun(ctx context.Context, run *workflow.WorkflowRun
 	return nil
 }
 
-func (s *DynamoDBStore) UpdateRunStatus(ctx context.Context, runID string, status workflow.RunStatus, wfErr *workflow.WorkflowError) error {
+func (s *DynamoDBStore) UpdateRunStatus(ctx context.Context, runID string, status gorkflow.RunStatus, wfErr *gorkflow.WorkflowError) error {
 	// Load current run
 	run, err := s.GetRun(ctx, runID)
 	if err != nil {
@@ -167,15 +167,15 @@ func (s *DynamoDBStore) UpdateRunStatus(ctx context.Context, runID string, statu
 	return s.UpdateRun(ctx, run)
 }
 
-func (s *DynamoDBStore) ListRuns(ctx context.Context, filter workflow.RunFilter) ([]*workflow.WorkflowRun, error) {
+func (s *DynamoDBStore) ListRuns(ctx context.Context, filter gorkflow.RunFilter) ([]*gorkflow.WorkflowRun, error) {
 	// TODO: Implement with Query using GSI1 or GSI2 based on filter
 	// For now, return empty list
-	return []*workflow.WorkflowRun{}, nil
+	return []*gorkflow.WorkflowRun{}, nil
 }
 
 // Step execution operations
 
-func (s *DynamoDBStore) CreateStepExecution(ctx context.Context, exec *workflow.StepExecution) error {
+func (s *DynamoDBStore) CreateStepExecution(ctx context.Context, exec *gorkflow.StepExecution) error {
 	exec.UpdatedAt = time.Now()
 
 	// Marshal
@@ -201,7 +201,7 @@ func (s *DynamoDBStore) CreateStepExecution(ctx context.Context, exec *workflow.
 	return nil
 }
 
-func (s *DynamoDBStore) GetStepExecution(ctx context.Context, runID, stepID string) (*workflow.StepExecution, error) {
+func (s *DynamoDBStore) GetStepExecution(ctx context.Context, runID, stepID string) (*gorkflow.StepExecution, error) {
 	result, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
@@ -217,7 +217,7 @@ func (s *DynamoDBStore) GetStepExecution(ctx context.Context, runID, stepID stri
 		return nil, fmt.Errorf("step execution %s/%s not found", runID, stepID)
 	}
 
-	var exec workflow.StepExecution
+	var exec gorkflow.StepExecution
 	if err := attributevalue.UnmarshalMap(result.Item, &exec); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal step execution: %w", err)
 	}
@@ -225,7 +225,7 @@ func (s *DynamoDBStore) GetStepExecution(ctx context.Context, runID, stepID stri
 	return &exec, nil
 }
 
-func (s *DynamoDBStore) UpdateStepExecution(ctx context.Context, exec *workflow.StepExecution) error {
+func (s *DynamoDBStore) UpdateStepExecution(ctx context.Context, exec *gorkflow.StepExecution) error {
 	exec.UpdatedAt = time.Now()
 
 	// Marshal
@@ -251,8 +251,8 @@ func (s *DynamoDBStore) UpdateStepExecution(ctx context.Context, exec *workflow.
 	return nil
 }
 
-func (s *DynamoDBStore) ListStepExecutions(ctx context.Context, runID string) ([]*workflow.StepExecution, error) {
-	var executions []*workflow.StepExecution
+func (s *DynamoDBStore) ListStepExecutions(ctx context.Context, runID string) ([]*gorkflow.StepExecution, error) {
+	var executions []*gorkflow.StepExecution
 	var lastEvaluatedKey map[string]types.AttributeValue
 
 	// Paginate through all results
@@ -276,7 +276,7 @@ func (s *DynamoDBStore) ListStepExecutions(ctx context.Context, runID string) ([
 		}
 
 		for _, item := range result.Items {
-			var exec workflow.StepExecution
+			var exec gorkflow.StepExecution
 			if err := attributevalue.UnmarshalMap(item, &exec); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal step execution: %w", err)
 			}
@@ -464,7 +464,7 @@ func (s *DynamoDBStore) GetAllState(ctx context.Context, runID string) (map[stri
 
 // Query operations
 
-func (s *DynamoDBStore) CountRunsByStatus(ctx context.Context, resourceID string, status workflow.RunStatus) (int, error) {
+func (s *DynamoDBStore) CountRunsByStatus(ctx context.Context, resourceID string, status gorkflow.RunStatus) (int, error) {
 	// Query GSI2 with resourceID and status
 	result, err := s.client.Query(ctx, &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),

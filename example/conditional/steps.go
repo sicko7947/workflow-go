@@ -3,14 +3,14 @@ package conditional
 import (
 	"fmt"
 
-	workflow "github.com/sicko7947/gorkflow"
+	"github.com/sicko7947/gorkflow"
 )
 
-func NewSetupStep() *workflow.Step[ConditionalInput, DoubleInput] {
-	return workflow.NewStep(
+func NewSetupStep() *gorkflow.Step[ConditionalInput, DoubleInput] {
+	return gorkflow.NewStep(
 		"setup",
 		"Setup Conditional Flags",
-		func(ctx *workflow.StepContext, input ConditionalInput) (DoubleInput, error) {
+		func(ctx *gorkflow.StepContext, input ConditionalInput) (DoubleInput, error) {
 			// Store flags in state for condition evaluation
 			ctx.State.Set("enable_doubling", input.EnableDoubling)
 			ctx.State.Set("enable_formatting", input.EnableFormatting)
@@ -26,11 +26,11 @@ func NewSetupStep() *workflow.Step[ConditionalInput, DoubleInput] {
 	)
 }
 
-func NewDoubleStep() *workflow.Step[DoubleInput, DoubleOutput] {
-	return workflow.NewStep(
+func NewDoubleStep() *gorkflow.Step[DoubleInput, DoubleOutput] {
+	return gorkflow.NewStep(
 		"double",
 		"Double the Value",
-		func(ctx *workflow.StepContext, input DoubleInput) (DoubleOutput, error) {
+		func(ctx *gorkflow.StepContext, input DoubleInput) (DoubleOutput, error) {
 			doubled := input.Value * 2
 			ctx.Logger.Info().
 				Int("original", input.Value).
@@ -45,11 +45,11 @@ func NewDoubleStep() *workflow.Step[DoubleInput, DoubleOutput] {
 	)
 }
 
-func NewConditionalFormatStep() *workflow.Step[ConditionalFormatInput, ConditionalFormatOutput] {
-	return workflow.NewStep(
+func NewConditionalFormatStep() *gorkflow.Step[ConditionalFormatInput, ConditionalFormatOutput] {
+	return gorkflow.NewStep(
 		"conditional_format",
 		"Format Result Conditionally",
-		func(ctx *workflow.StepContext, input ConditionalFormatInput) (ConditionalFormatOutput, error) {
+		func(ctx *gorkflow.StepContext, input ConditionalFormatInput) (ConditionalFormatOutput, error) {
 			formatted := fmt.Sprintf("Final value: %d (doubled: %v)", input.Value, input.Doubled)
 			if input.Message != "" {
 				formatted = fmt.Sprintf("%s | %s", formatted, input.Message)

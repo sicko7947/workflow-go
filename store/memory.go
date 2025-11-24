@@ -8,20 +8,20 @@ import (
 	"github.com/sicko7947/gorkflow"
 )
 
-// MemoryStore implements workflow.WorkflowStore using in-memory storage (for testing)
+// MemoryStore implements gorkflow.WorkflowStore using in-memory storage (for testing)
 type MemoryStore struct {
-	runs           map[string]*workflow.WorkflowRun
-	stepExecutions map[string]map[string]*workflow.StepExecution // runID -> stepID -> execution
+	runs           map[string]*gorkflow.WorkflowRun
+	stepExecutions map[string]map[string]*gorkflow.StepExecution // runID -> stepID -> execution
 	stepOutputs    map[string]map[string][]byte                  // runID -> stepID -> output
 	state          map[string]map[string][]byte                  // runID -> key -> value
 	mu             sync.RWMutex
 }
 
 // NewMemoryStore creates a new in-memory workflow store
-func NewMemoryStore() workflow.WorkflowStore {
+func NewMemoryStore() gorkflow.WorkflowStore {
 	return &MemoryStore{
-		runs:           make(map[string]*workflow.WorkflowRun),
-		stepExecutions: make(map[string]map[string]*workflow.StepExecution),
+		runs:           make(map[string]*gorkflow.WorkflowRun),
+		stepExecutions: make(map[string]map[string]*gorkflow.StepExecution),
 		stepOutputs:    make(map[string]map[string][]byte),
 		state:          make(map[string]map[string][]byte),
 	}
@@ -29,7 +29,7 @@ func NewMemoryStore() workflow.WorkflowStore {
 
 // Workflow run operations
 
-func (s *MemoryStore) CreateRun(ctx context.Context, run *workflow.WorkflowRun) error {
+func (s *MemoryStore) CreateRun(ctx context.Context, run *gorkflow.WorkflowRun) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -42,14 +42,14 @@ func (s *MemoryStore) CreateRun(ctx context.Context, run *workflow.WorkflowRun) 
 	s.runs[run.RunID] = &runCopy
 
 	// Initialize maps for this run
-	s.stepExecutions[run.RunID] = make(map[string]*workflow.StepExecution)
+	s.stepExecutions[run.RunID] = make(map[string]*gorkflow.StepExecution)
 	s.stepOutputs[run.RunID] = make(map[string][]byte)
 	s.state[run.RunID] = make(map[string][]byte)
 
 	return nil
 }
 
-func (s *MemoryStore) GetRun(ctx context.Context, runID string) (*workflow.WorkflowRun, error) {
+func (s *MemoryStore) GetRun(ctx context.Context, runID string) (*gorkflow.WorkflowRun, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -63,7 +63,7 @@ func (s *MemoryStore) GetRun(ctx context.Context, runID string) (*workflow.Workf
 	return &runCopy, nil
 }
 
-func (s *MemoryStore) UpdateRun(ctx context.Context, run *workflow.WorkflowRun) error {
+func (s *MemoryStore) UpdateRun(ctx context.Context, run *gorkflow.WorkflowRun) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -78,7 +78,7 @@ func (s *MemoryStore) UpdateRun(ctx context.Context, run *workflow.WorkflowRun) 
 	return nil
 }
 
-func (s *MemoryStore) UpdateRunStatus(ctx context.Context, runID string, status workflow.RunStatus, err *workflow.WorkflowError) error {
+func (s *MemoryStore) UpdateRunStatus(ctx context.Context, runID string, status gorkflow.RunStatus, err *gorkflow.WorkflowError) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -93,11 +93,11 @@ func (s *MemoryStore) UpdateRunStatus(ctx context.Context, runID string, status 
 	return nil
 }
 
-func (s *MemoryStore) ListRuns(ctx context.Context, filter workflow.RunFilter) ([]*workflow.WorkflowRun, error) {
+func (s *MemoryStore) ListRuns(ctx context.Context, filter gorkflow.RunFilter) ([]*gorkflow.WorkflowRun, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var runs []*workflow.WorkflowRun
+	var runs []*gorkflow.WorkflowRun
 
 	for _, run := range s.runs {
 		// Apply filters
@@ -126,12 +126,12 @@ func (s *MemoryStore) ListRuns(ctx context.Context, filter workflow.RunFilter) (
 
 // Step execution operations
 
-func (s *MemoryStore) CreateStepExecution(ctx context.Context, exec *workflow.StepExecution) error {
+func (s *MemoryStore) CreateStepExecution(ctx context.Context, exec *gorkflow.StepExecution) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, exists := s.stepExecutions[exec.RunID]; !exists {
-		s.stepExecutions[exec.RunID] = make(map[string]*workflow.StepExecution)
+		s.stepExecutions[exec.RunID] = make(map[string]*gorkflow.StepExecution)
 	}
 
 	// Deep copy
@@ -141,7 +141,7 @@ func (s *MemoryStore) CreateStepExecution(ctx context.Context, exec *workflow.St
 	return nil
 }
 
-func (s *MemoryStore) GetStepExecution(ctx context.Context, runID, stepID string) (*workflow.StepExecution, error) {
+func (s *MemoryStore) GetStepExecution(ctx context.Context, runID, stepID string) (*gorkflow.StepExecution, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -160,7 +160,7 @@ func (s *MemoryStore) GetStepExecution(ctx context.Context, runID, stepID string
 	return &execCopy, nil
 }
 
-func (s *MemoryStore) UpdateStepExecution(ctx context.Context, exec *workflow.StepExecution) error {
+func (s *MemoryStore) UpdateStepExecution(ctx context.Context, exec *gorkflow.StepExecution) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -175,16 +175,16 @@ func (s *MemoryStore) UpdateStepExecution(ctx context.Context, exec *workflow.St
 	return nil
 }
 
-func (s *MemoryStore) ListStepExecutions(ctx context.Context, runID string) ([]*workflow.StepExecution, error) {
+func (s *MemoryStore) ListStepExecutions(ctx context.Context, runID string) ([]*gorkflow.StepExecution, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	runExecs, exists := s.stepExecutions[runID]
 	if !exists {
-		return []*workflow.StepExecution{}, nil
+		return []*gorkflow.StepExecution{}, nil
 	}
 
-	executions := make([]*workflow.StepExecution, 0, len(runExecs))
+	executions := make([]*gorkflow.StepExecution, 0, len(runExecs))
 	for _, exec := range runExecs {
 		// Deep copy
 		execCopy := *exec
@@ -305,7 +305,7 @@ func (s *MemoryStore) GetAllState(ctx context.Context, runID string) (map[string
 
 // Query operations
 
-func (s *MemoryStore) CountRunsByStatus(ctx context.Context, resourceID string, status workflow.RunStatus) (int, error) {
+func (s *MemoryStore) CountRunsByStatus(ctx context.Context, resourceID string, status gorkflow.RunStatus) (int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
