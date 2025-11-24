@@ -1,6 +1,9 @@
 package gorkflow
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // RunStatus represents the current state of a workflow execution
 type RunStatus string
@@ -63,8 +66,8 @@ type WorkflowRun struct {
 	UpdatedAt   time.Time  `json:"updatedAt" dynamodbav:"updated_at"`
 
 	// Input/Output (serialized as JSON bytes)
-	Input  []byte `json:"input,omitempty" dynamodbav:"input,omitempty"`
-	Output []byte `json:"output,omitempty" dynamodbav:"output,omitempty"`
+	Input  json.RawMessage `json:"input,omitempty" dynamodbav:"input,omitempty"`
+	Output json.RawMessage `json:"output,omitempty" dynamodbav:"output,omitempty"`
 
 	// Error handling
 	Error *WorkflowError `json:"error,omitempty" dynamodbav:"error,omitempty"`
@@ -80,9 +83,9 @@ type WorkflowRun struct {
 
 // TriggerInfo captures what initiated the workflow
 type TriggerInfo struct {
-	Type      string    `json:"type" dynamodbav:"type"`             // "api", "schedule", "event"
-	Source    string    `json:"source" dynamodbav:"source"`         // User ID, system name, etc.
-	Timestamp time.Time `json:"timestamp" dynamodbav:"timestamp"`
+	Type      string            `json:"type" dynamodbav:"type"`     // "api", "schedule", "event"
+	Source    string            `json:"source" dynamodbav:"source"` // User ID, system name, etc.
+	Timestamp time.Time         `json:"timestamp" dynamodbav:"timestamp"`
 	Metadata  map[string]string `json:"metadata,omitempty" dynamodbav:"metadata,omitempty"`
 }
 
@@ -102,8 +105,8 @@ type StepExecution struct {
 	DurationMs  int64      `json:"durationMs" dynamodbav:"duration_ms"`
 
 	// Input/Output (serialized as JSON bytes)
-	Input  []byte `json:"input,omitempty" dynamodbav:"input,omitempty"`
-	Output []byte `json:"output,omitempty" dynamodbav:"output,omitempty"`
+	Input  json.RawMessage `json:"input,omitempty" dynamodbav:"input,omitempty"`
+	Output json.RawMessage `json:"output,omitempty" dynamodbav:"output,omitempty"`
 
 	// Error handling
 	Error   *StepError `json:"error,omitempty" dynamodbav:"error,omitempty"`

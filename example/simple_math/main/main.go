@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/sicko7947/gorkflow"
 	"github.com/sicko7947/gorkflow/engine"
@@ -48,6 +49,11 @@ func initializeApp() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create simple math workflow")
 	}
+
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stdout,
+		TimeFormat: time.RFC3339,
+	})
 
 	// Initialize engine
 	wfEngine = engine.NewEngine(
@@ -109,12 +115,6 @@ func handleStartWorkflow(c fiber.Ctx) error {
 			"error": "Invalid request body",
 		})
 	}
-
-	log.Info().
-		Int("val1", input.Val1).
-		Int("val2", input.Val2).
-		Int("mult", input.Mult).
-		Msg("Starting simple math workflow")
 
 	// Start workflow execution
 	runID, err := wfEngine.StartWorkflow(

@@ -53,8 +53,8 @@ func WithConfig(config EngineConfig) EngineOption {
 // If no logger is provided, a default stdout logger with Info level is used
 // If no config is provided, DefaultEngineConfig is used
 func NewEngine(store gorkflow.WorkflowStore, opts ...EngineOption) *Engine {
-	// Default logger: stdout, Info level
-	defaultLogger := zerolog.New(os.Stdout).
+	// Default logger: pretty console output, Info level
+	defaultLogger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).
 		With().
 		Timestamp().
 		Logger().
