@@ -244,3 +244,115 @@ func TestWorkflowBuilder_Parallel(t *testing.T) {
 	node1 := graph.Nodes["step1"]
 	assert.Equal(t, workflow.NodeTypeSequential, node1.Type)
 }
+
+func TestWorkflowBuilder_ThenStepIf(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+
+	condition := func(ctx *workflow.StepContext) (bool, error) {
+		return true, nil
+	}
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step1).
+		ThenStepIf(step2, condition, nil).
+		Build()
+
+	require.NoError(t, err)
+
+	// Verify step2 is registered
+	retrievedStep2, err := wf.GetStep("step2")
+	require.NoError(t, err)
+	assert.NotNil(t, retrievedStep2)
+
+	// Verify steps are connected
+	graph := wf.Graph()
+	nextSteps, err := graph.GetNextSteps("step1")
+	require.NoError(t, err)
+	assert.Contains(t, nextSteps, "step2")
+}
+
+func TestWorkflowBuilder_ThenStepIf_WithDefaultValue(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+
+	defaultValue := "default output"
+	condition := func(ctx *workflow.StepContext) (bool, error) {
+		return false, nil
+	}
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step1).
+		ThenStepIf(step2, condition, defaultValue).
+		Build()
+
+	require.NoError(t, err)
+	assert.NotNil(t, wf)
+
+	// Verify step2 is registered (even if conditional)
+	retrievedStep2, err := wf.GetStep("step2")
+	require.NoError(t, err)
+	assert.NotNil(t, retrievedStep2)
+}
+
+func TestWorkflowBuilder_ThenStepIf_ConditionFailure(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+
+	// Condition that returns an error
+	condition := func(ctx *workflow.StepContext) (bool, error) {
+		return false, assert.AnError
+	}
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step1).
+		ThenStepIf(step2, condition, nil).
+		Build()
+
+	require.NoError(t, err)
+	assert.NotNil(t, wf)
+}
+
+func TestWorkflowBuilder_MultipleConditionalSteps(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+	step3 := workflow.NewStep("step3", "Step 3", testHandler)
+	step4 := workflow.NewStep("step4", "Step 4", testHandler)
+
+	condition1 := func(ctx *workflow.StepContext) (bool, error) {
+		return true, nil
+	}
+
+	condition2 := func(ctx *workflow.StepContext) (bool, error) {
+		return false, nil
+	}
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step1).
+		ThenStepIf(step2, condition1, nil).
+		ThenStepIf(step3, condition2, "skipped").
+		ThenStep(step4).
+		Build()
+
+	require.NoError(t, err)
+
+	// Verify all steps are registered
+	graph := wf.Graph()
+	assert.NotNil(t, graph.Nodes["step1"])
+	assert.NotNil(t, graph.Nodes["step2"])
+	assert.NotNil(t, graph.Nodes["step3"])
+	assert.NotNil(t, graph.Nodes["step4"])
+
+	// Verify sequential connections
+	nextSteps1, err := graph.GetNextSteps("step1")
+	require.NoError(t, err)
+	assert.Contains(t, nextSteps1, "step2")
+
+	nextSteps2, err := graph.GetNextSteps("step2")
+	require.NoError(t, err)
+	assert.Contains(t, nextSteps2, "step3")
+
+	nextSteps3, err := graph.GetNextSteps("step3")
+	require.NoError(t, err)
+	assert.Contains(t, nextSteps3, "step4")
+}

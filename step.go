@@ -235,3 +235,75 @@ func NewConditionalStep[TIn, TOut any](
 		Default:   defaultValue,
 	}
 }
+
+// conditionalStepWrapper wraps any StepExecutor with conditional execution logic
+// This is used by the builder API to provide builder-level conditional support
+type conditionalStepWrapper struct {
+	step         StepExecutor
+	condition    Condition
+	defaultValue any
+}
+
+func (w *conditionalStepWrapper) GetID() string {
+	return w.step.GetID()
+}
+
+func (w *conditionalStepWrapper) GetName() string {
+	return w.step.GetName()
+}
+
+func (w *conditionalStepWrapper) GetDescription() string {
+	return w.step.GetDescription()
+}
+
+func (w *conditionalStepWrapper) GetConfig() ExecutionConfig {
+	return w.step.GetConfig()
+}
+
+func (w *conditionalStepWrapper) InputType() reflect.Type {
+	return w.step.InputType()
+}
+
+func (w *conditionalStepWrapper) OutputType() reflect.Type {
+	return w.step.OutputType()
+}
+
+func (w *conditionalStepWrapper) Execute(ctx *StepContext, inputBytes []byte) ([]byte, error) {
+	// Evaluate condition
+	shouldRun, err := w.condition(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("condition evaluation failed: %w", err)
+	}
+
+	if !shouldRun {
+		// Step skipped - return default or zero value
+		if w.defaultValue != nil {
+			return json.Marshal(w.defaultValue)
+		}
+		// Return zero value for the output type
+		zeroVal := reflect.Zero(w.step.OutputType()).Interface()
+		return json.Marshal(zeroVal)
+	}
+
+	// Execute the wrapped step
+	return w.step.Execute(ctx, inputBytes)
+}
+
+func (w *conditionalStepWrapper) ValidateInput(data []byte) error {
+	return w.step.ValidateInput(data)
+}
+
+func (w *conditionalStepWrapper) ValidateOutput(data []byte) error {
+	return w.step.ValidateOutput(data)
+}
+
+// WrapStepWithCondition wraps a StepExecutor with conditional execution logic
+// This is the type-erased version used by the builder API
+// For type-safe conditional steps, use NewConditionalStep directly
+func WrapStepWithCondition(step StepExecutor, condition Condition, defaultValue any) StepExecutor {
+	return &conditionalStepWrapper{
+		step:         step,
+		condition:    condition,
+		defaultValue: defaultValue,
+	}
+}

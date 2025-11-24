@@ -104,6 +104,23 @@ func (b *WorkflowBuilder) Sequence(steps ...workflow.StepExecutor) *WorkflowBuil
 	return b
 }
 
+// ThenStepIf chains a step with a condition after the last added step
+// The step executes only if condition evaluates to true at runtime
+// If false, defaultValue is used as output (pass nil for zero value)
+//
+// Example:
+//   condition := func(ctx *workflow.StepContext) (bool, error) {
+//       var shouldProcess bool
+//       ctx.State.Get("should_process", &shouldProcess)
+//       return shouldProcess, nil
+//   }
+//   builder.ThenStepIf(processStep, condition, nil)
+func (b *WorkflowBuilder) ThenStepIf(step workflow.StepExecutor, condition workflow.Condition, defaultValue any) *WorkflowBuilder {
+	// Wrap the step in a conditional wrapper
+	wrappedStep := workflow.WrapStepWithCondition(step, condition, defaultValue)
+	return b.ThenStep(wrappedStep)
+}
+
 // SetEntryPoint sets the workflow entry point explicitly
 func (b *WorkflowBuilder) SetEntryPoint(stepID string) *WorkflowBuilder {
 	if err := b.workflow.Graph().SetEntryPoint(stepID); err != nil {

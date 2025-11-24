@@ -7,6 +7,7 @@ import (
 	"github.com/sicko7947/workflow-go/builder"
 )
 
+// NewSimpleMathWorkflow constructs the simple math workflow
 func NewSimpleMathWorkflow() (*workflow.Workflow, error) {
 	wf, err := builder.NewWorkflow("simple_math", "Simple Math Workflow").
 		WithDescription("A simple workflow to test the engine").

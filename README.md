@@ -129,11 +129,15 @@ func main() {
     // Create store
     store := store.NewMemoryStore()
 
-    // Create logger
-    logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+    // Create engine with default logger and config
+    eng := engine.NewEngine(store)
 
-    // Create engine
-    eng := engine.NewEngine(store, logger, engine.DefaultEngineConfig)
+    // Or with custom logger and config
+    // logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+    // eng := engine.NewEngine(store,
+    //     engine.WithLogger(logger),
+    //     engine.WithConfig(engine.DefaultEngineConfig),
+    // )
 
     // Create workflow
     wf, err := NewCalculationWorkflow()
@@ -205,19 +209,42 @@ step := workflow.NewStep(
 
 ### Conditional Execution
 
-Add conditional branching to your workflows:
+Execute steps conditionally based on runtime evaluation:
 
 ```go
-wf.Graph().AddConditionalEdge(
-    "check-step",
-    "success-step",
-    workflow.Condition{
-        Field:    "status",
-        Operator: workflow.OpEquals,
-        Value:    "success",
-    },
-)
+// Define a condition function
+condition := func(ctx *workflow.StepContext) (bool, error) {
+    // Access state or previous step outputs
+    var shouldProcess bool
+    ctx.State.Get("should_process", &shouldProcess)
+    return shouldProcess, nil
+}
+
+// Builder-level API (recommended)
+processStep := workflow.NewStep("process", "Process Data", processHandler)
+
+wf, err := builder.NewWorkflow("conditional-workflow", "Conditional Workflow").
+    ThenStep(checkStep).
+    ThenStepIf(processStep, condition, nil).  // ← Builder-level conditional
+    ThenStep(finalStep).
+    Build()
+
+// Alternative: Step-level API (for type-safe default values)
+baseStep := workflow.NewStep("process", "Process Data", processHandler)
+defaultOutput := &ProcessOutput{Status: "skipped"}
+conditionalStep := workflow.NewConditionalStep(baseStep, condition, defaultOutput)
+
+wf, err := builder.NewWorkflow("conditional-workflow", "Conditional Workflow").
+    ThenStep(checkStep).
+    ThenStep(conditionalStep).
+    Build()
 ```
+
+**How it works:**
+- Condition is evaluated before step execution
+- Step executes only if condition returns `true`
+- If `false`, uses default value (or zero value if nil)
+- Condition errors propagate and fail the workflow
 
 ### State Management
 
@@ -295,6 +322,39 @@ client := dynamodb.NewFromConfig(cfg)
 store, err := store.NewDynamoDBStore(client, "workflow-table")
 ```
 
+**Setting up DynamoDB Table**
+
+Use the included helper scripts to manage your DynamoDB table. The scripts accept configuration via environment variables:
+
+**Environment Variables:**
+- `AWS_REGION` - AWS region (default: `ap-southeast-2`)
+- `AWS_DYNAMODB_TABLE_NAME` - Table name (default: `workflow_executions`)
+
+**Usage:**
+
+```bash
+# Using defaults (ap-southeast-2 region, workflow_executions table)
+./scripts/create-dynamodb-table.sh
+
+# Custom region and table name
+export AWS_REGION=us-east-1
+export AWS_DYNAMODB_TABLE_NAME=my_workflow_table
+./scripts/create-dynamodb-table.sh
+
+# Or inline
+AWS_REGION=eu-west-1 AWS_DYNAMODB_TABLE_NAME=workflows ./scripts/create-dynamodb-table.sh
+
+# Delete table (prompts for confirmation)
+./scripts/delete-dynamodb-table.sh
+```
+
+**What the create script does:**
+- Creates a table with Single Table Design (PK/SK pattern)
+- Adds 2 Global Secondary Indexes (GSI1, GSI2) for flexible querying
+- Enables TTL on the `ttl` attribute for automatic cleanup
+- Uses PAY_PER_REQUEST billing mode
+- Tags the table with project metadata
+
 #### Memory Store
 
 In-memory storage for testing and development:
@@ -322,12 +382,20 @@ workflow-go/
 │   ├── memory.go     # In-memory implementation
 │   ├── dynamodb.go   # DynamoDB implementation
 │   └── schema.go     # Data models
-├── example/          # Example implementation
-│   ├── workflow.go   # Sample workflow definition
-│   ├── steps.go      # Sample step implementations
-│   ├── orchestrator.go # Workflow orchestrator
-│   ├── types.go      # Type definitions
-│   └── GUIDE.md      # Example usage guide
+├── example/          # Example implementations
+│   ├── README.md     # Example overview and usage guide
+│   ├── simple_math/  # Simple sequential workflow example
+│   │   ├── workflow.go      # Workflow definition
+│   │   ├── steps.go         # Step implementations
+│   │   ├── orchestrator.go  # Workflow orchestrator
+│   │   ├── types.go         # Type definitions
+│   │   └── README.md        # Example-specific guide
+│   └── conditional/  # Conditional execution example
+│       ├── workflow.go      # Conditional workflow definition
+│       ├── steps.go         # Conditional step implementations
+│       ├── orchestrator.go  # Workflow orchestrator
+│       ├── types.go         # Type definitions
+│       └── README.md        # Example-specific guide
 ├── workflow.go       # Workflow definition
 ├── step.go           # Step definition and execution
 ├── graph.go          # Execution graph
@@ -338,21 +406,38 @@ workflow-go/
 └── store_interface.go # Store interface definition
 ```
 
-## Example: Simple Math Workflow
+## Examples
 
-See the [example/](example/) directory for a complete working example that demonstrates:
+The [example/](example/) directory contains complete working examples demonstrating different workflow patterns:
 
+### Simple Math Workflow
+
+Located in [example/simple_math/](example/simple_math/), demonstrates:
 - Sequential step execution
 - Data passing between steps
+- Type-safe step definitions
 - Step configuration (retries, timeouts)
 - Workflow orchestration
-- HTTP API integration
 
-To explore the example:
+### Conditional Workflow
+
+Located in [example/conditional/](example/conditional/), demonstrates:
+- Conditional step execution with `ThenStepIf`
+- Runtime condition evaluation from workflow state
+- Default values for skipped steps
+- Dynamic workflow paths based on input flags
+
+To explore the examples:
 
 ```bash
 cd example/
-cat GUIDE.md  # Read the example guide
+cat README.md  # Read the example overview
+
+cd simple_math/
+cat README.md  # Simple math workflow guide
+
+cd ../conditional/
+cat README.md  # Conditional workflow guide
 ```
 
 ## Configuration
@@ -389,13 +474,27 @@ workflow.NewStep(
 
 ### Engine Configuration
 
-Configure the execution engine:
+Configure the execution engine with optional parameters:
 
 ```go
-engine.NewEngine(store, logger, engine.EngineConfig{
+// Simple: Use defaults (stdout logger at Info level, DefaultEngineConfig)
+eng := engine.NewEngine(store)
+
+// Custom logger only
+logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+eng := engine.NewEngine(store, engine.WithLogger(logger))
+
+// Custom config only
+eng := engine.NewEngine(store, engine.WithConfig(engine.EngineConfig{
     MaxConcurrentWorkflows: 10,
     DefaultTimeout:         5 * time.Minute,
-})
+}))
+
+// Both custom logger and config
+eng := engine.NewEngine(store,
+    engine.WithLogger(logger),
+    engine.WithConfig(customConfig),
+)
 ```
 
 ## Testing

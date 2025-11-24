@@ -2,7 +2,6 @@ package simple_math
 
 import (
 	"fmt"
-
 	"time"
 
 	workflow "github.com/sicko7947/workflow-go"

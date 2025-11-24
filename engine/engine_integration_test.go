@@ -98,10 +98,13 @@ func filterCompanies(ctx *workflow.StepContext, input FilterInput) (FilterOutput
 func createTestEngine(t *testing.T) (*Engine, workflow.WorkflowStore) {
 	wfStore := store.NewMemoryStore()
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	engine := NewEngine(wfStore, logger, EngineConfig{
-		MaxConcurrentWorkflows: 10,
-		DefaultTimeout:         5 * time.Minute,
-	})
+	engine := NewEngine(wfStore,
+		WithLogger(logger),
+		WithConfig(EngineConfig{
+			MaxConcurrentWorkflows: 10,
+			DefaultTimeout:         5 * time.Minute,
+		}),
+	)
 	return engine, wfStore
 }
 

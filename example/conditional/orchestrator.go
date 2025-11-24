@@ -1,4 +1,4 @@
-package simple_math
+package conditional
 
 import (
 	"context"
@@ -10,27 +10,30 @@ import (
 	"github.com/sicko7947/workflow-go/engine"
 )
 
-// Orchestrator handles the execution of simple math workflows
+// Orchestrator handles the execution of conditional workflows
 type Orchestrator struct {
 	workflow *workflow.Workflow
 	engine   *engine.Engine
 	logger   zerolog.Logger
 }
 
-// NewOrchestrator creates a new workflow orchestrator
+// NewOrchestrator creates a new conditional workflow orchestrator
 func NewOrchestrator(
 	store workflow.WorkflowStore,
 	logger zerolog.Logger,
 	config engine.EngineConfig,
 ) (*Orchestrator, error) {
-	// Create workflow
-	wf, err := NewSimpleMathWorkflow()
+	// Create conditional workflow
+	wf, err := NewConditionalWorkflow()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create workflow: %w", err)
+		return nil, fmt.Errorf("failed to create conditional workflow: %w", err)
 	}
 
-	// Create engine
-	eng := engine.NewEngine(store, logger, config)
+	// Create engine with logger and config options
+	eng := engine.NewEngine(store,
+		engine.WithLogger(logger),
+		engine.WithConfig(config),
+	)
 
 	return &Orchestrator{
 		workflow: wf,
@@ -39,16 +42,16 @@ func NewOrchestrator(
 	}, nil
 }
 
-// StartWorkflow initiates a new simple math workflow execution
+// StartWorkflow initiates a new conditional workflow execution
 func (o *Orchestrator) StartWorkflow(
 	ctx context.Context,
-	input WorkflowInput,
+	input ConditionalInput,
 ) (string, error) {
 	o.logger.Info().
-		Int("val1", input.Val1).
-		Int("val2", input.Val2).
-		Int("mult", input.Mult).
-		Msg("Starting simple math workflow")
+		Int("value", input.Value).
+		Bool("enable_doubling", input.EnableDoubling).
+		Bool("enable_formatting", input.EnableFormatting).
+		Msg("Starting conditional workflow")
 
 	// Start workflow execution
 	runID, err := o.engine.StartWorkflow(
@@ -56,7 +59,7 @@ func (o *Orchestrator) StartWorkflow(
 		o.workflow,
 		input,
 		workflow.WithTags(map[string]string{
-			"type": "simple_math",
+			"type": "conditional",
 		}),
 	)
 
@@ -66,7 +69,7 @@ func (o *Orchestrator) StartWorkflow(
 
 	o.logger.Info().
 		Str("run_id", runID).
-		Msg("Simple math workflow started successfully")
+		Msg("Conditional workflow started successfully")
 
 	return runID, nil
 }
@@ -94,9 +97,8 @@ func (o *Orchestrator) GetWorkflowStatus(
 	}
 
 	// If completed, parse output
-	// Note: The final output of simple_math workflow is FormatOutput
 	if run.Status == workflow.RunStatusCompleted && len(run.Output) > 0 {
-		var output FormatOutput
+		var output ConditionalFormatOutput
 		if err := json.Unmarshal(run.Output, &output); err != nil {
 			o.logger.Warn().
 				Err(err).
@@ -115,9 +117,9 @@ func (o *Orchestrator) CancelWorkflow(ctx context.Context, runID string) error {
 	return o.engine.Cancel(ctx, runID)
 }
 
-// WorkflowStatus represents the current status of a workflow run
+// WorkflowStatus represents the current status of a conditional workflow run
 type WorkflowStatus struct {
 	*workflow.WorkflowRun
 	StepExecutions []*workflow.StepExecution `json:"stepExecutions,omitempty"`
-	Output         *FormatOutput             `json:"output,omitempty"`
+	Output         *ConditionalFormatOutput  `json:"output,omitempty"`
 }

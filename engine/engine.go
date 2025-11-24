@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,12 +32,46 @@ var DefaultEngineConfig = EngineConfig{
 }
 
 // NewEngine creates a new workflow engine
-func NewEngine(store workflow.WorkflowStore, logger zerolog.Logger, config EngineConfig) *Engine {
-	return &Engine{
-		store:  store,
-		logger: logger,
-		config: config,
+// EngineOption configures the workflow engine
+type EngineOption func(*Engine)
+
+// WithLogger sets a custom logger for the engine
+func WithLogger(logger zerolog.Logger) EngineOption {
+	return func(e *Engine) {
+		e.logger = logger
 	}
+}
+
+// WithConfig sets a custom configuration for the engine
+func WithConfig(config EngineConfig) EngineOption {
+	return func(e *Engine) {
+		e.config = config
+	}
+}
+
+// NewEngine creates a new workflow engine with optional configuration
+// If no logger is provided, a default stdout logger with Info level is used
+// If no config is provided, DefaultEngineConfig is used
+func NewEngine(store workflow.WorkflowStore, opts ...EngineOption) *Engine {
+	// Default logger: stdout, Info level
+	defaultLogger := zerolog.New(os.Stdout).
+		With().
+		Timestamp().
+		Logger().
+		Level(zerolog.InfoLevel)
+
+	eng := &Engine{
+		store:  store,
+		logger: defaultLogger,
+		config: DefaultEngineConfig,
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(eng)
+	}
+
+	return eng
 }
 
 // StartWorkflow initiates a workflow execution
