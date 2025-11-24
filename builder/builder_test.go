@@ -1,0 +1,246 @@
+package builder
+
+import (
+	"testing"
+
+	"github.com/sicko7947/workflow-go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// Test handler
+func testHandler(ctx *workflow.StepContext, input interface{}) (interface{}, error) {
+	return input, nil
+}
+
+func TestNewWorkflow(t *testing.T) {
+	builder := NewWorkflow("test-workflow", "Test Workflow")
+
+	assert.NotNil(t, builder)
+	// We can't access builder.workflow directly as it is private,
+	// but we can verify Build() works
+	wf, err := builder.Build()
+	require.Error(t, err) // Error because no steps
+	assert.Nil(t, wf)
+}
+
+func TestWorkflowBuilder_WithDescription(t *testing.T) {
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		WithDescription("A test workflow").
+		ThenStep(workflow.NewStep("step1", "Step 1", testHandler)).
+		Build()
+
+	require.NoError(t, err)
+	assert.Equal(t, "A test workflow", wf.Description())
+}
+
+func TestWorkflowBuilder_WithVersion(t *testing.T) {
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		WithVersion("1.0.0").
+		ThenStep(workflow.NewStep("step1", "Step 1", testHandler)).
+		Build()
+
+	require.NoError(t, err)
+	assert.Equal(t, "1.0.0", wf.Version())
+}
+
+func TestWorkflowBuilder_WithDefaultConfig(t *testing.T) {
+	config := workflow.ExecutionConfig{
+		MaxRetries:     5,
+		TimeoutSeconds: 60,
+		RetryBackoff:   workflow.BackoffExponential,
+	}
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		WithConfig(config).
+		ThenStep(workflow.NewStep("step1", "Step 1", testHandler)).
+		Build()
+
+	require.NoError(t, err)
+	assert.Equal(t, config, wf.GetConfig())
+}
+
+func TestWorkflowBuilder_Sequence(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		Sequence(step1, step2).
+		Build()
+
+	require.NoError(t, err)
+
+	// Verify steps are registered
+	retrievedStep1, err := wf.GetStep("step1")
+	require.NoError(t, err)
+	retrievedStep2, err := wf.GetStep("step2")
+	require.NoError(t, err)
+
+	assert.NotNil(t, retrievedStep1)
+	assert.NotNil(t, retrievedStep2)
+	assert.Equal(t, "step1", retrievedStep1.GetID())
+	assert.Equal(t, "step2", retrievedStep2.GetID())
+
+	// Verify graph connection
+	graph := wf.Graph()
+	nextSteps, err := graph.GetNextSteps("step1")
+	require.NoError(t, err)
+	assert.Contains(t, nextSteps, "step2")
+}
+
+func TestWorkflowBuilder_ThenStep(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step1).
+		ThenStep(step2).
+		Build()
+
+	require.NoError(t, err)
+
+	// Verify steps are connected
+	graph := wf.Graph()
+	nextSteps, err := graph.GetNextSteps("step1")
+	require.NoError(t, err)
+	assert.Contains(t, nextSteps, "step2")
+}
+
+func TestWorkflowBuilder_SetEntryPoint(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step2).
+		ThenStep(step1). // Connect step2 -> step1
+		SetEntryPoint("step2").
+		Build()
+
+	require.NoError(t, err)
+	assert.Equal(t, "step2", wf.Graph().EntryPoint)
+}
+
+func TestWorkflowBuilder_AutoEntryPoint(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step1).
+		ThenStep(step2).
+		Build()
+
+	require.NoError(t, err)
+	// Entry point should be auto-set to first step (step1)
+	assert.Equal(t, "step1", wf.Graph().EntryPoint)
+}
+
+func TestWorkflowBuilder_Build_EmptyWorkflow(t *testing.T) {
+	_, err := NewWorkflow("test-workflow", "Test Workflow").
+		Build()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no entry point") // Updated assertion
+}
+
+func TestWorkflowBuilder_Build_NoEntryPoint(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step1).
+		Build()
+
+	require.NoError(t, err)
+	// Should auto-set entry point to the only step
+	assert.Equal(t, "step1", wf.Graph().EntryPoint)
+}
+
+func TestWorkflowBuilder_Build_InvalidGraph(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step2 := workflow.NewStep("step2", "Step 2", testHandler)
+
+	// Create a cycle: step1 -> step2 -> step1
+	_, err := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step1).
+		ThenStep(step2).
+		ThenStep(step1).
+		Build()
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cycle")
+}
+
+func TestWorkflowBuilder_MustBuild_Success(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+
+	wf := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step1).
+		MustBuild()
+
+	assert.NotNil(t, wf)
+	assert.Equal(t, "test-workflow", wf.ID())
+}
+
+func TestWorkflowBuilder_MustBuild_Panic(t *testing.T) {
+	assert.Panics(t, func() {
+		NewWorkflow("test-workflow", "Test Workflow").
+			MustBuild()
+	})
+}
+
+func TestWorkflowBuilder_WithTags(t *testing.T) {
+	tags := map[string]string{
+		"env":     "test",
+		"version": "1.0",
+	}
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		WithTags(tags).
+		ThenStep(workflow.NewStep("step1", "Step 1", testHandler)).
+		Build()
+
+	require.NoError(t, err)
+	assert.NotNil(t, wf)
+}
+
+func TestWorkflowBuilder_Parallel(t *testing.T) {
+	step1 := workflow.NewStep("step1", "Step 1", testHandler)
+	step2a := workflow.NewStep("step2a", "Step 2a", testHandler)
+	step2b := workflow.NewStep("step2b", "Step 2b", testHandler)
+	step3 := workflow.NewStep("step3", "Step 3", testHandler)
+
+	wf, err := NewWorkflow("test-workflow", "Test Workflow").
+		ThenStep(step1).
+		Parallel(step2a, step2b).
+		ThenStep(step3).
+		Build()
+
+	require.NoError(t, err)
+
+	// Verify graph structure
+	graph := wf.Graph()
+
+	// step1 -> [step2a, step2b]
+	nextSteps1, err := graph.GetNextSteps("step1")
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"step2a", "step2b"}, nextSteps1)
+
+	// step2a -> step3
+	nextSteps2a, err := graph.GetNextSteps("step2a")
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"step3"}, nextSteps2a)
+
+	// step2b -> step3
+	nextSteps2b, err := graph.GetNextSteps("step2b")
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"step3"}, nextSteps2b)
+
+	// Check node types
+	node2a := graph.Nodes["step2a"]
+	assert.Equal(t, workflow.NodeTypeParallel, node2a.Type)
+
+	node2b := graph.Nodes["step2b"]
+	assert.Equal(t, workflow.NodeTypeParallel, node2b.Type)
+
+	node1 := graph.Nodes["step1"]
+	assert.Equal(t, workflow.NodeTypeSequential, node1.Type)
+}

@@ -1,0 +1,416 @@
+package engine
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/sicko7947/workflow-go"
+	"github.com/sicko7947/workflow-go/builder"
+	"github.com/sicko7947/workflow-go/store"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// Test types
+type DiscoverInput struct {
+	Query string `json:"query"`
+	Limit int    `json:"limit"`
+}
+
+type DiscoverOutput struct {
+	Companies []string `json:"companies"`
+	Count     int      `json:"count"`
+}
+
+type EnrichInput struct {
+	Companies []string `json:"companies"`
+}
+
+type EnrichOutput struct {
+	Enriched map[string]interface{} `json:"enriched"`
+}
+
+type FilterInput struct {
+	Data map[string]interface{} `json:"data"`
+}
+
+type FilterOutput struct {
+	Filtered []string `json:"filtered"`
+}
+
+// Test step handlers
+func discoverCompanies(ctx *workflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
+	ctx.Logger.Info().
+		Str("query", input.Query).
+		Int("limit", input.Limit).
+		Msg("Discovering companies")
+
+	companies := []string{"CompanyA", "CompanyB", "CompanyC"}
+	return DiscoverOutput{
+		Companies: companies,
+		Count:     len(companies),
+	}, nil
+}
+
+func enrichCompanies(ctx *workflow.StepContext, input EnrichInput) (EnrichOutput, error) {
+	// Access previous step output
+	discoverResult, err := workflow.GetTypedOutput[DiscoverOutput](ctx.Outputs, "discover")
+	if err != nil {
+		return EnrichOutput{}, err
+	}
+
+	ctx.Logger.Info().
+		Int("companies_count", len(discoverResult.Companies)).
+		Msg("Enriching companies")
+
+	enriched := make(map[string]interface{})
+	for _, company := range discoverResult.Companies {
+		enriched[company] = map[string]interface{}{
+			"name":     company,
+			"size":     "medium",
+			"industry": "tech",
+		}
+	}
+
+	return EnrichOutput{Enriched: enriched}, nil
+}
+
+func filterCompanies(ctx *workflow.StepContext, input FilterInput) (FilterOutput, error) {
+	enrichResult, err := workflow.GetTypedOutput[EnrichOutput](ctx.Outputs, "enrich")
+	if err != nil {
+		return FilterOutput{}, err
+	}
+
+	ctx.Logger.Info().
+		Int("companies_count", len(enrichResult.Enriched)).
+		Msg("Filtering companies")
+
+	filtered := []string{"CompanyA", "CompanyB"}
+	return FilterOutput{Filtered: filtered}, nil
+}
+
+// Helper to create engine
+func createTestEngine(t *testing.T) (*Engine, workflow.WorkflowStore) {
+	wfStore := store.NewMemoryStore()
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	engine := NewEngine(wfStore, logger, EngineConfig{
+		MaxConcurrentWorkflows: 10,
+		DefaultTimeout:         5 * time.Minute,
+	})
+	return engine, wfStore
+}
+
+// Helper to wait for workflow completion
+func waitForCompletion(t *testing.T, engine *Engine, runID string, timeout time.Duration) *workflow.WorkflowRun {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatal("Timeout waiting for workflow completion")
+		case <-ticker.C:
+			run, err := engine.GetRun(context.Background(), runID)
+			require.NoError(t, err)
+
+			if run.Status.IsTerminal() {
+				return run
+			}
+		}
+	}
+}
+
+func TestEngine_SimpleSequentialWorkflow(t *testing.T) {
+	engine, _ := createTestEngine(t)
+
+	// Build workflow
+	discoverStep := workflow.NewStep("discover", "Discover Companies", discoverCompanies)
+	enrichStep := workflow.NewStep("enrich", "Enrich Companies", enrichCompanies)
+	filterStep := workflow.NewStep("filter", "Filter Companies", filterCompanies)
+
+	wf, err := builder.NewWorkflow("sequential_test", "Sequential Test").
+		ThenStep(discoverStep).
+		ThenStep(enrichStep).
+		ThenStep(filterStep).
+		Build()
+	require.NoError(t, err)
+
+	// Execute workflow
+	input := DiscoverInput{
+		Query: "tech companies",
+		Limit: 10,
+	}
+
+	runID, err := engine.StartWorkflow(context.Background(), wf, input)
+	require.NoError(t, err)
+	require.NotEmpty(t, runID)
+
+	// Wait for completion
+	run := waitForCompletion(t, engine, runID, 10*time.Second)
+
+	// Verify final status
+	assert.Equal(t, workflow.RunStatusCompleted, run.Status)
+	assert.Equal(t, 1.0, run.Progress)
+	assert.NotNil(t, run.CompletedAt)
+
+	// Verify step executions
+	steps, err := engine.GetStepExecutions(context.Background(), runID)
+	require.NoError(t, err)
+	assert.Len(t, steps, 3)
+
+	// All steps should be completed
+	for _, step := range steps {
+		assert.Equal(t, workflow.StepStatusCompleted, step.Status)
+		assert.NotNil(t, step.CompletedAt)
+	}
+}
+
+func TestEngine_WorkflowWithFailure(t *testing.T) {
+	engine, _ := createTestEngine(t)
+
+	// Step that always fails
+	failingStep := workflow.NewStep("failing", "Failing Step",
+		func(ctx *workflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
+			return DiscoverOutput{}, errors.New("intentional failure")
+		},
+		workflow.WithRetries(2),
+	)
+
+	wf, err := builder.NewWorkflow("failing_workflow", "Failing Workflow").
+		ThenStep(failingStep).
+		Build()
+	require.NoError(t, err)
+
+	// Execute
+	runID, err := engine.StartWorkflow(context.Background(), wf, DiscoverInput{Query: "test", Limit: 10})
+	require.NoError(t, err)
+
+	// Wait for completion
+	run := waitForCompletion(t, engine, runID, 10*time.Second)
+
+	// Should fail
+	assert.Equal(t, workflow.RunStatusFailed, run.Status)
+	assert.NotNil(t, run.Error)
+	assert.Contains(t, run.Error.Message, "intentional failure")
+}
+
+func TestEngine_WorkflowProgress(t *testing.T) {
+	engine, _ := createTestEngine(t)
+
+	// Slow steps to observe progress
+	slowStep1 := workflow.NewStep("slow1", "Slow Step 1",
+		func(ctx *workflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
+			time.Sleep(500 * time.Millisecond)
+			return DiscoverOutput{Companies: []string{"A"}, Count: 1}, nil
+		},
+	)
+
+	slowStep2 := workflow.NewStep("slow2", "Slow Step 2",
+		func(ctx *workflow.StepContext, input EnrichInput) (EnrichOutput, error) {
+			time.Sleep(500 * time.Millisecond)
+			return EnrichOutput{Enriched: map[string]interface{}{"A": "data"}}, nil
+		},
+	)
+
+	wf, err := builder.NewWorkflow("progress_test", "Progress Test").
+		ThenStep(slowStep1).
+		ThenStep(slowStep2).
+		Build()
+	require.NoError(t, err)
+
+	// Execute
+	runID, err := engine.StartWorkflow(context.Background(), wf, DiscoverInput{Query: "test", Limit: 10})
+	require.NoError(t, err)
+
+	// Check progress over time
+	time.Sleep(600 * time.Millisecond) // After first step
+	run, _ := engine.GetRun(context.Background(), runID)
+	assert.Greater(t, run.Progress, 0.0)
+	assert.Less(t, run.Progress, 1.0)
+
+	// Wait for completion
+	run = waitForCompletion(t, engine, runID, 10*time.Second)
+	assert.Equal(t, 1.0, run.Progress)
+}
+
+func TestEngine_StepOutputPassing(t *testing.T) {
+	engine, wfStore := createTestEngine(t)
+
+	// Build workflow
+	discoverStep := workflow.NewStep("discover", "Discover", discoverCompanies)
+	enrichStep := workflow.NewStep("enrich", "Enrich", enrichCompanies)
+
+	wf, err := builder.NewWorkflow("output_test", "Output Test").
+		ThenStep(discoverStep).
+		ThenStep(enrichStep).
+		Build()
+	require.NoError(t, err)
+
+	// Execute
+	runID, err := engine.StartWorkflow(context.Background(), wf, DiscoverInput{Query: "test", Limit: 10})
+	require.NoError(t, err)
+
+	// Wait for completion
+	waitForCompletion(t, engine, runID, 10*time.Second)
+
+	// Verify step outputs are stored
+	discoverOutputBytes, err := wfStore.LoadStepOutput(context.Background(), runID, "discover")
+	require.NoError(t, err)
+
+	var discoverOutput DiscoverOutput
+	json.Unmarshal(discoverOutputBytes, &discoverOutput)
+	assert.Greater(t, discoverOutput.Count, 0)
+	assert.NotEmpty(t, discoverOutput.Companies)
+
+	// Verify enrich step used discover output
+	enrichOutputBytes, err := wfStore.LoadStepOutput(context.Background(), runID, "enrich")
+	require.NoError(t, err)
+
+	var enrichOutput EnrichOutput
+	json.Unmarshal(enrichOutputBytes, &enrichOutput)
+	assert.NotEmpty(t, enrichOutput.Enriched)
+}
+
+func TestEngine_GetStepExecutions(t *testing.T) {
+	engine, _ := createTestEngine(t)
+
+	discoverStep := workflow.NewStep("discover", "Discover", discoverCompanies)
+	enrichStep := workflow.NewStep("enrich", "Enrich", enrichCompanies)
+
+	wf, err := builder.NewWorkflow("test", "Test").
+		ThenStep(discoverStep).
+		ThenStep(enrichStep).
+		Build()
+	require.NoError(t, err)
+
+	runID, err := engine.StartWorkflow(context.Background(), wf, DiscoverInput{Query: "test", Limit: 10})
+	require.NoError(t, err)
+
+	waitForCompletion(t, engine, runID, 10*time.Second)
+
+	// Get step executions
+	steps, err := engine.GetStepExecutions(context.Background(), runID)
+	require.NoError(t, err)
+
+	assert.Len(t, steps, 2)
+
+	// Verify step metadata
+	for _, step := range steps {
+		assert.NotEmpty(t, step.StepID)
+		assert.NotNil(t, step.StartedAt)
+		assert.NotNil(t, step.CompletedAt)
+		// Duration can be 0 for very fast steps (< 1ms), so we just check it's non-negative
+		assert.GreaterOrEqual(t, step.DurationMs, int64(0))
+	}
+}
+
+func TestEngine_ListRuns(t *testing.T) {
+	engine, _ := createTestEngine(t)
+
+	step := workflow.NewStep("test", "Test", discoverCompanies)
+
+	wf, err := builder.NewWorkflow("diamond_test", "Diamond Test").
+		ThenStep(step).
+		Build()
+	require.NoError(t, err)
+
+	// Create multiple runs
+	runID1, _ := engine.StartWorkflow(context.Background(), wf, DiscoverInput{Query: "test1", Limit: 10})
+	runID2, _ := engine.StartWorkflow(context.Background(), wf, DiscoverInput{Query: "test2", Limit: 10})
+
+	waitForCompletion(t, engine, runID1, 10*time.Second)
+	waitForCompletion(t, engine, runID2, 10*time.Second)
+
+	// List runs
+	filter := workflow.RunFilter{
+		WorkflowID: "diamond_test",
+		Limit:      10,
+	}
+
+	runs, err := engine.ListRuns(context.Background(), filter)
+	require.NoError(t, err)
+
+	assert.GreaterOrEqual(t, len(runs), 2)
+}
+
+func TestEngine_Cancel(t *testing.T) {
+	engine, _ := createTestEngine(t)
+
+	// Long-running step
+	longStep := workflow.NewStep("long", "Long Step",
+		func(ctx *workflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
+			// Simulate long operation
+			select {
+			case <-ctx.Done():
+				return DiscoverOutput{}, ctx.Err()
+			case <-time.After(10 * time.Second):
+				return DiscoverOutput{Companies: []string{"A"}, Count: 1}, nil
+			}
+		},
+	)
+
+	wf, err := builder.NewWorkflow("concurrency_test", "Concurrency Test").
+		ThenStep(longStep).
+		Build()
+	require.NoError(t, err)
+
+	// Start workflow
+	runID, err := engine.StartWorkflow(context.Background(), wf, DiscoverInput{Query: "test", Limit: 10})
+	require.NoError(t, err)
+
+	// Wait a bit to ensure it starts
+	time.Sleep(200 * time.Millisecond)
+
+	// Cancel
+	err = engine.Cancel(context.Background(), runID)
+	require.NoError(t, err)
+
+	// Wait and verify cancellation
+	time.Sleep(500 * time.Millisecond)
+	run, _ := engine.GetRun(context.Background(), runID)
+	assert.Equal(t, workflow.RunStatusCancelled, run.Status)
+}
+
+func TestEngine_WorkflowState(t *testing.T) {
+	engine, wfStore := createTestEngine(t)
+
+	// Step that uses state
+	statefulStep := workflow.NewStep("stateful", "Stateful Step",
+		func(ctx *workflow.StepContext, input DiscoverInput) (DiscoverOutput, error) {
+			// Write to state
+			ctx.State.Set("timestamp", time.Now().Unix())
+			ctx.State.Set("query", input.Query)
+
+			// Read from state
+			var query string
+			ctx.State.Get("query", &query)
+
+			return DiscoverOutput{Companies: []string{query}, Count: 1}, nil
+		},
+	)
+
+	wf, err := builder.NewWorkflow("state_test", "State Test").
+		ThenStep(statefulStep).
+		Build()
+	require.NoError(t, err)
+
+	runID, err := engine.StartWorkflow(context.Background(), wf, DiscoverInput{Query: "test-query", Limit: 10})
+	require.NoError(t, err)
+
+	waitForCompletion(t, engine, runID, 10*time.Second)
+
+	// Verify state was persisted
+	allState, err := wfStore.GetAllState(context.Background(), runID)
+	require.NoError(t, err)
+
+	assert.Contains(t, allState, "timestamp")
+	assert.Contains(t, allState, "query")
+}

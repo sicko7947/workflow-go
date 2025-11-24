@@ -1,0 +1,451 @@
+# Workflow Go
+
+A powerful, type-safe, and flexible workflow orchestration engine for Go with built-in state persistence, retries, and DAG-based execution.
+
+## Features
+
+- **🎯 Type-Safe Step Definitions**: Strongly-typed input/output for workflow steps using Go generics
+- **📊 DAG-Based Execution**: Define workflows as directed acyclic graphs with sequential and parallel execution
+- **🔄 Built-in Retry Logic**: Configurable retry policies with linear and exponential backoff strategies
+- **💾 Persistent State Management**: Pluggable storage backends (DynamoDB and in-memory implementations included)
+- **⚡ Parallel Execution**: Execute multiple steps concurrently when they don't depend on each other
+- **🔍 Progress Tracking**: Monitor workflow execution status and step-level progress in real-time
+- **⏱️ Timeout Support**: Per-step timeout configuration to prevent hanging operations
+- **🏗️ Fluent Builder API**: Easy-to-use builder pattern for constructing complex workflows
+- **📝 Structured Logging**: Built-in integration with zerolog for comprehensive execution logs
+- **🎨 Conditional Branching**: Support for conditional step execution based on runtime data
+- **🛑 Cancellation Support**: Cancel running workflows gracefully
+- **🏷️ Tagging and Metadata**: Add custom tags and metadata to workflow runs for categorization
+
+## Installation
+
+```bash
+go get github.com/sicko7947/workflow-go
+```
+
+## Quick Start
+
+### 1. Define Your Step Types
+
+```go
+package main
+
+import (
+    "fmt"
+    workflow "github.com/sicko7947/workflow-go"
+)
+
+// Input for the workflow
+type CalculationInput struct {
+    A int `json:"a"`
+    B int `json:"b"`
+}
+
+// Output from step 1
+type SumOutput struct {
+    Sum int `json:"sum"`
+}
+
+// Output from step 2
+type ResultOutput struct {
+    Result  int    `json:"result"`
+    Message string `json:"message"`
+}
+```
+
+### 2. Create Steps with Handlers
+
+```go
+func NewAddStep() *workflow.Step[CalculationInput, SumOutput] {
+    return workflow.NewStep(
+        "add",
+        "Add Two Numbers",
+        func(ctx *workflow.StepContext, input CalculationInput) (SumOutput, error) {
+            sum := input.A + input.B
+            ctx.Logger.Info().Int("sum", sum).Msg("Addition completed")
+            return SumOutput{Sum: sum}, nil
+        },
+    )
+}
+
+func NewFormatStep() *workflow.Step[SumOutput, ResultOutput] {
+    return workflow.NewStep(
+        "format",
+        "Format Result",
+        func(ctx *workflow.StepContext, input SumOutput) (ResultOutput, error) {
+            message := fmt.Sprintf("The sum is %d", input.Sum)
+            return ResultOutput{
+                Result:  input.Sum,
+                Message: message,
+            }, nil
+        },
+        workflow.WithRetries(5),
+        workflow.WithTimeout(5*time.Second),
+    )
+}
+```
+
+### 3. Build Your Workflow
+
+```go
+import (
+    "github.com/sicko7947/workflow-go/builder"
+)
+
+func NewCalculationWorkflow() (*workflow.Workflow, error) {
+    wf, err := builder.NewWorkflow("calculation", "Calculation Workflow").
+        WithDescription("A simple calculation workflow").
+        WithVersion("1.0").
+        WithConfig(workflow.ExecutionConfig{
+            MaxRetries:     3,
+            RetryDelayMs:   1000,
+            TimeoutSeconds: 30,
+        }).
+        Sequence(
+            NewAddStep(),
+            NewFormatStep(),
+        ).
+        Build()
+
+    if err != nil {
+        return nil, err
+    }
+
+    return wf, nil
+}
+```
+
+### 4. Execute the Workflow
+
+```go
+import (
+    "context"
+    "github.com/rs/zerolog"
+    "github.com/sicko7947/workflow-go/engine"
+    "github.com/sicko7947/workflow-go/store"
+)
+
+func main() {
+    // Create store
+    store := store.NewMemoryStore()
+
+    // Create logger
+    logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+
+    // Create engine
+    eng := engine.NewEngine(store, logger, engine.DefaultEngineConfig)
+
+    // Create workflow
+    wf, err := NewCalculationWorkflow()
+    if err != nil {
+        logger.Fatal().Err(err).Msg("Failed to create workflow")
+    }
+
+    // Start workflow
+    ctx := context.Background()
+    runID, err := eng.StartWorkflow(
+        ctx,
+        wf,
+        CalculationInput{A: 10, B: 5},
+        workflow.WithTags(map[string]string{
+            "type": "calculation",
+        }),
+    )
+
+    if err != nil {
+        logger.Fatal().Err(err).Msg("Failed to start workflow")
+    }
+
+    logger.Info().Str("run_id", runID).Msg("Workflow started")
+
+    // Get workflow status
+    run, err := eng.GetRun(ctx, runID)
+    if err != nil {
+        logger.Fatal().Err(err).Msg("Failed to get workflow status")
+    }
+
+    logger.Info().
+        Str("status", string(run.Status)).
+        Float64("progress", run.Progress).
+        Msg("Workflow status")
+}
+```
+
+## Advanced Features
+
+### Parallel Execution
+
+Execute multiple independent steps in parallel:
+
+```go
+wf, err := builder.NewWorkflow("parallel-example", "Parallel Example").
+    Parallel(
+        NewStep1(),
+        NewStep2(),
+        NewStep3(),
+    ).
+    ThenStep(NewMergeStep()).
+    Build()
+```
+
+### Retry Configuration
+
+Configure step-specific retry behavior:
+
+```go
+step := workflow.NewStep(
+    "retry-example",
+    "Step with Custom Retry",
+    handler,
+    workflow.WithRetries(5),
+    workflow.WithBackoff(workflow.BackoffExponential),
+    workflow.WithTimeout(10*time.Second),
+)
+```
+
+### Conditional Execution
+
+Add conditional branching to your workflows:
+
+```go
+wf.Graph().AddConditionalEdge(
+    "check-step",
+    "success-step",
+    workflow.Condition{
+        Field:    "status",
+        Operator: workflow.OpEquals,
+        Value:    "success",
+    },
+)
+```
+
+### State Management
+
+Access and modify workflow state during execution:
+
+```go
+func handler(ctx *workflow.StepContext, input MyInput) (MyOutput, error) {
+    // Get state accessor
+    state := ctx.State
+
+    // Set state
+    state.Set(ctx.Context, "counter", 42)
+
+    // Get state
+    counter, err := state.Get(ctx.Context, "counter")
+
+    // Access previous step output
+    outputs := ctx.Outputs
+    prevOutput, err := outputs.Get(ctx.Context, "previous-step-id")
+
+    return MyOutput{}, nil
+}
+```
+
+### Cancellation
+
+Cancel a running workflow:
+
+```go
+err := eng.Cancel(ctx, runID)
+if err != nil {
+    logger.Error().Err(err).Msg("Failed to cancel workflow")
+}
+```
+
+## Architecture
+
+### Core Components
+
+- **`workflow.Workflow`**: The workflow definition containing steps, execution graph, and configuration
+- **`workflow.Step[TIn, TOut]`**: Type-safe step definition with input/output types
+- **`engine.Engine`**: Orchestrates workflow execution, handles retries, and manages state transitions
+- **`ExecutionGraph`**: DAG representation of workflow steps and their dependencies
+- **`WorkflowStore`**: Persistence layer interface for storing workflow runs and step executions
+
+### Execution Flow
+
+```
+1. StartWorkflow() → Create WorkflowRun
+2. Engine.executeWorkflow() → Traverse execution graph
+3. For each step:
+   - Create StepExecution
+   - Execute handler with retries
+   - Store output
+   - Update progress
+4. Complete workflow → Update final status
+```
+
+### Storage Backends
+
+#### DynamoDB Store
+
+Persistent storage using AWS DynamoDB:
+
+```go
+import (
+    "github.com/sicko7947/workflow-go/store"
+    "github.com/aws/aws-sdk-go-v2/config"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+)
+
+cfg, _ := config.LoadDefaultConfig(context.Background())
+client := dynamodb.NewFromConfig(cfg)
+
+store, err := store.NewDynamoDBStore(client, "workflow-table")
+```
+
+#### Memory Store
+
+In-memory storage for testing and development:
+
+```go
+store := store.NewMemoryStore()
+```
+
+## Package Structure
+
+```
+workflow-go/
+├── builder/          # Fluent API for building workflows
+│   ├── builder.go    # WorkflowBuilder implementation
+│   ├── options.go    # Builder options
+│   └── validation.go # Workflow validation
+├── engine/           # Workflow execution engine
+│   ├── engine.go     # Main engine implementation
+│   ├── executor.go   # Step execution logic
+│   ├── traverser.go  # Graph traversal
+│   ├── backoff.go    # Retry backoff strategies
+│   └── *_test.go     # Engine tests
+├── store/            # Persistence layer
+│   ├── store.go      # Store interface
+│   ├── memory.go     # In-memory implementation
+│   ├── dynamodb.go   # DynamoDB implementation
+│   └── schema.go     # Data models
+├── example/          # Example implementation
+│   ├── workflow.go   # Sample workflow definition
+│   ├── steps.go      # Sample step implementations
+│   ├── orchestrator.go # Workflow orchestrator
+│   ├── types.go      # Type definitions
+│   └── GUIDE.md      # Example usage guide
+├── workflow.go       # Workflow definition
+├── step.go           # Step definition and execution
+├── graph.go          # Execution graph
+├── models.go         # Core data models
+├── config.go         # Configuration types
+├── context.go        # Execution context
+├── errors.go         # Error types
+└── store_interface.go # Store interface definition
+```
+
+## Example: Simple Math Workflow
+
+See the [example/](example/) directory for a complete working example that demonstrates:
+
+- Sequential step execution
+- Data passing between steps
+- Step configuration (retries, timeouts)
+- Workflow orchestration
+- HTTP API integration
+
+To explore the example:
+
+```bash
+cd example/
+cat GUIDE.md  # Read the example guide
+```
+
+## Configuration
+
+### Workflow-Level Configuration
+
+Set default execution parameters for all steps:
+
+```go
+builder.NewWorkflow("my-workflow", "My Workflow").
+    WithConfig(workflow.ExecutionConfig{
+        MaxRetries:      3,
+        RetryDelayMs:    1000,
+        RetryBackoff:    workflow.BackoffLinear,
+        TimeoutSeconds:  30,
+        ContinueOnError: false,
+    })
+```
+
+### Step-Level Configuration
+
+Override workflow defaults for specific steps:
+
+```go
+workflow.NewStep(
+    "my-step",
+    "My Step",
+    handler,
+    workflow.WithRetries(5),
+    workflow.WithBackoff(workflow.BackoffExponential),
+    workflow.WithTimeout(60*time.Second),
+)
+```
+
+### Engine Configuration
+
+Configure the execution engine:
+
+```go
+engine.NewEngine(store, logger, engine.EngineConfig{
+    MaxConcurrentWorkflows: 10,
+    DefaultTimeout:         5 * time.Minute,
+})
+```
+
+## Testing
+
+Run tests:
+
+```bash
+# Run all tests
+go test ./...
+
+# Run tests with coverage
+go test -cover ./...
+
+# Run integration tests (requires DynamoDB)
+go test -tags=integration ./store/...
+```
+
+## Requirements
+
+- **Go**: 1.21 or higher (uses generics)
+- **AWS SDK v2**: For DynamoDB store integration
+- **zerolog**: For structured logging
+
+## Dependencies
+
+```go
+require (
+    github.com/aws/aws-sdk-go-v2 v1.40.0
+    github.com/aws/aws-sdk-go-v2/service/dynamodb v1.53.1
+    github.com/google/uuid v1.6.0
+    github.com/rs/zerolog v1.34.0
+)
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+Extracted from the Tendor Email Agent project and refactored into a standalone, reusable workflow engine library.
+
+## Support
+
+For issues, questions, or contributions, please open an issue on GitHub.
