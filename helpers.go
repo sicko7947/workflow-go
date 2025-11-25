@@ -1,6 +1,10 @@
 package gorkflow
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 // Package internal provides shared utility functions for the workflow framework.
 // This package contains generic helpers used across the workflow implementation.
@@ -45,4 +49,18 @@ func CalculateBackoff(baseDelayMs int, attempt int, strategy string) time.Durati
 		// Default to linear
 		return baseDelay * time.Duration(attempt)
 	}
+}
+
+// GetRunContext retrieves and deserializes the custom context from a WorkflowRun
+func GetRunContext[T any](run *WorkflowRun) (T, error) {
+	var zero T
+	if len(run.Context) == 0 {
+		return zero, fmt.Errorf("workflow run has no context")
+	}
+
+	var result T
+	if err := json.Unmarshal(run.Context, &result); err != nil {
+		return zero, fmt.Errorf("failed to unmarshal context: %w", err)
+	}
+	return result, nil
 }

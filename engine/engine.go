@@ -96,6 +96,15 @@ func (e *Engine) StartWorkflow(
 		return "", fmt.Errorf("failed to serialize workflow input: %w", err)
 	}
 
+	// Serialize context if present
+	var contextBytes json.RawMessage
+	if wf.GetContext() != nil {
+		contextBytes, err = json.Marshal(wf.GetContext())
+		if err != nil {
+			return "", fmt.Errorf("failed to serialize workflow context: %w", err)
+		}
+	}
+
 	// Create workflow run
 	now := time.Now()
 	run := &gorkflow.WorkflowRun{
@@ -107,6 +116,7 @@ func (e *Engine) StartWorkflow(
 		CreatedAt:       now,
 		UpdatedAt:       now,
 		Input:           inputBytes,
+		Context:         contextBytes,
 		ResourceID:      options.ResourceID,
 		Trigger: &gorkflow.TriggerInfo{
 			Type:      options.TriggerType,

@@ -77,6 +77,9 @@ type WorkflowRun struct {
 	Trigger    *TriggerInfo      `json:"trigger,omitempty" dynamodbav:"trigger,omitempty"`
 	Tags       map[string]string `json:"tags,omitempty" dynamodbav:"tags,omitempty"`
 
+	// Custom context (serialized as JSON bytes)
+	Context json.RawMessage `json:"context,omitempty" dynamodbav:"context,omitempty"`
+
 	// DynamoDB TTL
 	TTL int64 `json:"-" dynamodbav:"ttl,omitempty"`
 }
