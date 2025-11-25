@@ -241,6 +241,7 @@ wf, err := builder.NewWorkflow("conditional-workflow", "Conditional Workflow").
 ```
 
 **How it works:**
+
 - Condition is evaluated before step execution
 - Step executes only if condition returns `true`
 - If `false`, uses default value (or zero value if nil)
@@ -277,6 +278,34 @@ Cancel a running workflow:
 err := eng.Cancel(ctx, runID)
 if err != nil {
     logger.Error().Err(err).Msg("Failed to cancel workflow")
+}
+```
+
+### Custom Context
+
+Pass a custom context struct to your workflow, accessible by all steps:
+
+```go
+// Define your context
+type MyContext struct {
+    UserID string
+    TraceID string
+}
+
+// Create workflow with context
+wf := builder.NewWorkflow("my-wf", "My Workflow").
+    WithContext(MyContext{UserID: "123", TraceID: "abc"}).
+    ThenStep(myStep).
+    MustBuild()
+
+// Access in step
+func myStepHandler(ctx *workflow.StepContext, input string) (string, error) {
+    myCtx, err := workflow.GetContext[MyContext](ctx)
+    if err != nil {
+        return "", err
+    }
+    // Use myCtx.UserID, etc.
+    return "ok", nil
 }
 ```
 
@@ -327,6 +356,7 @@ store, err := store.NewDynamoDBStore(client, "workflow-table")
 Use the included helper scripts to manage your DynamoDB table. The scripts accept configuration via environment variables:
 
 **Environment Variables:**
+
 - `AWS_REGION` - AWS region (default: `ap-southeast-2`)
 - `AWS_DYNAMODB_TABLE_NAME` - Table name (default: `workflow_executions`)
 
@@ -349,6 +379,7 @@ AWS_REGION=eu-west-1 AWS_DYNAMODB_TABLE_NAME=workflows ./scripts/create-dynamodb
 ```
 
 **What the create script does:**
+
 - Creates a table with Single Table Design (PK/SK pattern)
 - Adds 2 Global Secondary Indexes (GSI1, GSI2) for flexible querying
 - Enables TTL on the `ttl` attribute for automatic cleanup
@@ -413,6 +444,7 @@ The [example/](example/) directory contains complete working examples demonstrat
 ### Simple Math Workflow
 
 Located in [example/simple_math/](example/simple_math/), demonstrates:
+
 - Sequential step execution
 - Data passing between steps
 - Type-safe step definitions
@@ -422,6 +454,7 @@ Located in [example/simple_math/](example/simple_math/), demonstrates:
 ### Conditional Workflow
 
 Located in [example/conditional/](example/conditional/), demonstrates:
+
 - Conditional step execution with `ThenStepIf`
 - Runtime condition evaluation from workflow state
 - Default values for skipped steps

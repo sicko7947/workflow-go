@@ -25,6 +25,23 @@ type StepContext struct {
 
 	// Access to workflow-level state
 	State StateAccessor
+
+	// Custom context (user-defined)
+	CustomContext any
+}
+
+// GetContext retrieves the custom context from the step context
+func GetContext[T any](ctx *StepContext) (T, error) {
+	var zero T
+	if ctx.CustomContext == nil {
+		return zero, fmt.Errorf("custom context is nil")
+	}
+
+	val, ok := ctx.CustomContext.(T)
+	if !ok {
+		return zero, fmt.Errorf("custom context is not of type %T", zero)
+	}
+	return val, nil
 }
 
 // StepOutputAccessor provides type-safe access to other step outputs

@@ -24,6 +24,9 @@ type Workflow struct {
 	// Metadata
 	tags      map[string]string
 	createdAt time.Time
+
+	// Custom context
+	customContext any
 }
 
 // ID returns the workflow ID
@@ -70,9 +73,24 @@ func (w *Workflow) GetConfig() ExecutionConfig {
 	return w.config
 }
 
+// GetContext returns the custom context
+func (w *Workflow) GetContext() any {
+	return w.customContext
+}
+
+// WorkflowOption configures a workflow
+type WorkflowOption func(*Workflow)
+
+// WithContext sets a custom context for the workflow
+func WithContext(ctx any) WorkflowOption {
+	return func(w *Workflow) {
+		w.customContext = ctx
+	}
+}
+
 // NewWorkflowInstance creates a new workflow instance
-func NewWorkflowInstance(id, name string) *Workflow {
-	return &Workflow{
+func NewWorkflowInstance(id, name string, opts ...WorkflowOption) *Workflow {
+	w := &Workflow{
 		id:        id,
 		name:      name,
 		version:   "1.0",
@@ -82,6 +100,12 @@ func NewWorkflowInstance(id, name string) *Workflow {
 		tags:      make(map[string]string),
 		createdAt: time.Now(),
 	}
+
+	for _, opt := range opts {
+		opt(w)
+	}
+
+	return w
 }
 
 // SetDescription sets the workflow description
@@ -107,4 +131,9 @@ func (w *Workflow) SetTags(tags map[string]string) {
 // AddStep registers a step in the workflow
 func (w *Workflow) AddStep(step StepExecutor) {
 	w.steps[step.GetID()] = step
+}
+
+// SetContext sets the custom context for the workflow
+func (w *Workflow) SetContext(ctx any) {
+	w.customContext = ctx
 }

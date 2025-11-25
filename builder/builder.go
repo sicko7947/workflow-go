@@ -46,6 +46,12 @@ func (b *WorkflowBuilder) WithTags(tags map[string]string) *WorkflowBuilder {
 	return b
 }
 
+// WithContext sets a custom context for the workflow
+func (b *WorkflowBuilder) WithContext(ctx any) *WorkflowBuilder {
+	b.workflow.SetContext(ctx)
+	return b
+}
+
 // ThenStep chains the given step after the last added step
 func (b *WorkflowBuilder) ThenStep(step gorkflow.StepExecutor) *WorkflowBuilder {
 	stepID := step.GetID()

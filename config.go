@@ -148,3 +148,10 @@ func WithTags(tags map[string]string) StartOption {
 		opts.Tags = tags
 	}
 }
+
+// WithSynchronousExecution enables synchronous execution
+func WithSynchronousExecution() StartOption {
+	return func(opts *StartOptions) {
+		opts.Synchronous = true
+	}
+}

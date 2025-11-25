@@ -25,6 +25,7 @@ func (e *Engine) executeStep(
 	inputBytes []byte,
 	outputs gorkflow.StepOutputAccessor,
 	state gorkflow.StateAccessor,
+	customContext any,
 ) (*StepExecutionResult, error) {
 	config := step.GetConfig()
 
@@ -48,12 +49,13 @@ func (e *Engine) executeStep(
 	stepLogger := gorkflow.StepLogger(e.logger, step.GetID(), step.GetName(), 0).With().Str("run_id", run.RunID).Logger()
 
 	stepCtx := &gorkflow.StepContext{
-		Context: ctx,
-		RunID:   run.RunID,
-		StepID:  step.GetID(),
-		Logger:  stepLogger,
-		Outputs: outputs,
-		State:   state,
+		Context:       ctx,
+		RunID:         run.RunID,
+		StepID:        step.GetID(),
+		Logger:        stepLogger,
+		Outputs:       outputs,
+		State:         state,
+		CustomContext: customContext,
 	}
 
 	var outputBytes []byte
